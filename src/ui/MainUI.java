@@ -893,8 +893,29 @@ public class MainUI extends JFrame {
 				}
 				
 				setColor(smellColors, drs.getCellArray(), Color.LIGHT_GRAY);
+				//table.update(table.getGraphics());
+				textArea_repairAdvise.update(textArea_repairAdvise.getGraphics());
 				
-				drs.repairSmell();
+				boolean recovery = drs.recovery();
+				if(!recovery) {
+					WaitDialog waitDialog = new WaitDialog();
+					waitDialog.setAlwaysOnTop(true);
+					waitDialog.setLocationRelativeTo(getParent());
+					waitDialog.setResizable(false);
+					waitDialog.setVisible(true);
+					waitDialog.update(waitDialog.getGraphics());
+
+					drs.synthesize();
+					
+					waitDialog.setVisible(false);
+				}
+				
+				try {
+					drs.repairSmell();
+				} catch (Exception e1) {
+					e1.printStackTrace();
+				}
+				
 				StructDefine.SmellAndRepair smellAndRepair = drs.getSmellAndRepair();
 				
 				if(drs.getState() != -1) {

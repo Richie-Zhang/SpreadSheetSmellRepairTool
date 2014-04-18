@@ -36,8 +36,9 @@ public class DetectRepairSmell {
 	private ArrayList<IOPair> IO;
 	private ArrayList<IntegerVariable> varsTable;
 	private StructDefine.SmellAndRepair smellAndRepair;
+	private Formula repairFormula;
 	
-	private int state;	//-1-无法合成，1-已有公式，2-合成成功
+	private int state;	//-1-无法合成，1-已有公式，2-合成成功, 3-已修复
 	
 	public DetectRepairSmell(SheetReader sr, StructDefine.Region snip) throws Exception{
 		this.sheetReader = sr;
@@ -70,50 +71,62 @@ public class DetectRepairSmell {
     				if(!FormulaParser.isEquivalent(formula, lastFormula, IV))
     					return true;
     			}
-					
     		}
     	}
     	return false;
 	}
-
-	public void repairSmell() {
-		if(state != 0) return;
-		
+	
+	public boolean recovery() {
+		if(state == 3) return true;
 		try {
-			Formula formula = recoveryFormulaPattern();
-			if(formula != null) {
+			repairFormula = recoveryFormulaPattern();
+			if(repairFormula != null) {
 				state = 1;
+				return true;
 			}
-			else {
-				formula = synthesizeFormulaPattern();
-				if(formula != null) state = 2;
-				else {
-					state = -1;
-					return;
-				}
-			}
-			
-			int startRow = cellArray.GetTopLeft().GetRow(), endRow = cellArray.GetBottomRight().GetRow();
-	    	int startColumn = cellArray.GetTopLeft().GetColumn(), endColumn = cellArray.GetBottomRight().GetColumn();
-	    	for(int i = startRow ; i <= endRow ; i++)
-	    		for(int j = startColumn ; j <= endColumn ; j++) {
-	    			String advise = formula.getA1Formula(new StructDefine.Position(i, j));
-	    			ExpParser expParser = new ExpParser(sheetReader, new StructDefine.Position(i, j));
-	    			double value = expParser.evaluate(formula.getR1C1Formula());	
-	    			if(!advise.equals(sheetReader.getCells()[i][j].getFormula())) {
-	    				StructDefine.RepairAdvise ra = new StructDefine.RepairAdvise();
-	    				ra.SetFormula(advise);
-	    				ra.SetValue(value);
-	    				if((Double.parseDouble(sheetReader.getCells()[i][j].getValue()) - value > 0.000001) || (Double.parseDouble(sheetReader.getCells()[i][j].getValue()) - value < -0.000001))
-	    					ra.SetType(1);	//值错误
-	    				else 
-	    					ra.SetType(2);	//
-	    				smellAndRepair.AddRepairAdvise(new StructDefine.Position(i,j), ra);
-	    			}
-	    		}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		return false;
+	}
+	
+	public boolean synthesize() {
+		if(state == 3) return true;
+		try {
+			repairFormula = synthesizeFormulaPattern();
+			if(repairFormula != null) {
+				state = 2;
+				return true;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		state = -1;
+		return false;
+	}
+
+	public void repairSmell() throws Exception {
+		if(state == 3 || repairFormula == null) return;
+		
+		int startRow = cellArray.GetTopLeft().GetRow(), endRow = cellArray.GetBottomRight().GetRow();
+    	int startColumn = cellArray.GetTopLeft().GetColumn(), endColumn = cellArray.GetBottomRight().GetColumn();
+    	for(int i = startRow ; i <= endRow ; i++)
+    		for(int j = startColumn ; j <= endColumn ; j++) {
+    			String advise = repairFormula.getA1Formula(new StructDefine.Position(i, j));
+    			ExpParser expParser = new ExpParser(sheetReader, new StructDefine.Position(i, j));
+    			double value = expParser.evaluate(repairFormula.getR1C1Formula());	
+    			if(!advise.equals(sheetReader.getCells()[i][j].getFormula())) {
+    				StructDefine.RepairAdvise ra = new StructDefine.RepairAdvise();
+    				ra.SetFormula(advise);
+    				ra.SetValue(value);
+    				if((Double.parseDouble(sheetReader.getCells()[i][j].getValue()) - value > 0.000001) || (Double.parseDouble(sheetReader.getCells()[i][j].getValue()) - value < -0.000001))
+    					ra.SetType(1);	//值错误
+    				else 
+    					ra.SetType(2);	//
+    				smellAndRepair.AddRepairAdvise(new StructDefine.Position(i,j), ra);
+    			}
+    		}
+    	state = 3;
 	}
 	
 	public int getState() {

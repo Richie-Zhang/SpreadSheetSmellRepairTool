@@ -30,8 +30,6 @@ public class TestEqui {
 		
 		Constraint cons = Choco.neq(Choco.plus(table.get(0),Choco.plus(table.get(1),Choco.plus(table.get(0),table.get(1)))), iev);
 		
-		
-		
 		model.addConstraint(cons);
 		
 		solver.read(model);
