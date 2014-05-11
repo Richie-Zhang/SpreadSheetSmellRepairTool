@@ -49,7 +49,15 @@ public class AutoDetectSmell {
 				DetectRepairSmell detectRepairSmell = new DetectRepairSmell(sheetReader, cellArray);
 				if(detectRepairSmell.hasSmell()) {
 					hasSmell = true;
-					if(detectRepairSmell.getState() == 1) {
+					boolean recovery = detectRepairSmell.recovery();
+					if(!recovery) detectRepairSmell.synthesize();
+					try {
+						detectRepairSmell.repairSmell();
+					} catch (Exception e1) {
+						e1.printStackTrace();
+					}
+					
+					if(detectRepairSmell.getState() != 1) {
 						SmellAndRepair smellAndRepair = detectRepairSmell.getSmellAndRepair();
 						for(int j = 0 ; j < smellAndRepair.GetPositions().size() ; j++) {
 							Position position = smellAndRepair.GetPositions().get(j);

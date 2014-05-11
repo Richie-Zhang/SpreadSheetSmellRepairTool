@@ -855,7 +855,7 @@ public class MainUI extends JFrame {
 		
 		JScrollPane scrollPane_smell = new JScrollPane();
 		panel_detectSmell.add(scrollPane_smell, BorderLayout.CENTER);
-		scrollPane_smell.setPreferredSize(new Dimension(WIDTH, 250));
+		scrollPane_smell.setPreferredSize(new Dimension(WIDTH, 180));
 		
 		String[] headers = {"Upper left", "Lower right", "Stage"};
 		DefaultTableModel model = new DefaultTableModel(null, headers);
@@ -898,7 +898,7 @@ public class MainUI extends JFrame {
 				
 				boolean recovery = drs.recovery();
 				if(!recovery) {
-					WaitDialog waitDialog = new WaitDialog();
+					WaitDialog waitDialog = new WaitDialog(1);
 					waitDialog.setAlwaysOnTop(true);
 					waitDialog.setLocationRelativeTo(getParent());
 					waitDialog.setResizable(false);
@@ -945,11 +945,11 @@ public class MainUI extends JFrame {
 							
 							if(ra.GetType() == 1) {
 								setColor(smellColors, new StructDefine.Region(pos, pos), Color.RED);
-								textArea_repairAdvise.append("Error: Cell("+posString+"): Change to formula "+formulaString+"(value = "+ra.GetValue()+")\n");
+								textArea_repairAdvise.append("Error: Cell("+posString+"): Change to formula "+formulaString+" (value = "+ra.GetValue()+")\n");
 							}
 							else if(ra.GetType() == 2) {
 								setColor(smellColors, new StructDefine.Region(pos, pos), Color.YELLOW);
-								textArea_repairAdvise.append("Smell: Cell("+posString+"): Change to formula "+formulaString+"(value = "+ra.GetValue()+")\n");
+								textArea_repairAdvise.append("Smell: Cell("+posString+"): Change to formula "+formulaString+" (value = "+ra.GetValue()+")\n");
 							}
 						}
 					}
@@ -987,7 +987,7 @@ public class MainUI extends JFrame {
 				int row = table_smell.getSelectedRow();
 				if(row < 0) return;
 				DetectRepairSmell drs = detectRepairSmells.get(row);
-				if(drs.getSmellAndRepair().GetAccepted() != 0 || drs.getState() == -1) return;
+				if(drs.getSmellAndRepair().GetAccepted() != 0) return;
 				int result = JOptionPane.showConfirmDialog(null, "Sure to ignore the item ?", "Warning", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
 				if(result == JOptionPane.YES_OPTION) {
 					table_smell.setValueAt("Ignored", table_smell.getSelectedRow(), 2);
@@ -1030,7 +1030,7 @@ public class MainUI extends JFrame {
 				int row = table_smell.getSelectedRow();
 				if(row < 0) return;
 				DetectRepairSmell drs = detectRepairSmells.get(row);
-				if(drs.getSmellAndRepair().GetAccepted() != 0 || drs.getState() == -1) return;
+				if(drs.getSmellAndRepair().GetAccepted() != 0) return;
 				
 				ManualUpdate manualUpdateDialog = new ManualUpdate(sheetReaders.get(currentSheetIndex), drs.getCellArray());
 				manualUpdateDialog.setModal(true);
@@ -1042,12 +1042,17 @@ public class MainUI extends JFrame {
 				int index = -1;
 				drs.getSmellAndRepair().SetAccepted(3);
 				table_smell.setValueAt("Manual Updated", table_smell.getSelectedRow(), 2);
+				setColor(smellColors, new StructDefine.Region(drs.getCellArray().GetTopLeft(), drs.getCellArray().GetBottomRight()), Color.LIGHT_GRAY);
 				DefaultTableModel tableModel = (DefaultTableModel)table.getModel();
 				for(int i = drs.getCellArray().GetTopLeft().GetRow() ; i <= drs.getCellArray().GetBottomRight().GetRow() ; i++)
 					for(int j = drs.getCellArray().GetTopLeft().GetColumn() ; j <= drs.getCellArray().GetBottomRight().GetColumn() ; j++) {
 						index++;
 						if(sheetReaders.get(currentSheetIndex).getCells()[i][j].getCellType() == Cell.CELL_TYPE_FORMULA && sheetReaders.get(currentSheetIndex).getCells()[i][j].getFormula().equals(inputFormulas.get(index)))
 							continue;
+						if(sheetReaders.get(currentSheetIndex).getCells()[i][j].getCellType() == Cell.CELL_TYPE_NUMERIC && sheetReaders.get(currentSheetIndex).getCells()[i][j].getValue().equals(inputFormulas.get(index))){
+							System.err.println(sheetReaders.get(currentSheetIndex).getCells()[i][j].getValue());
+							continue;
+						}
 						drs.getSmellAndRepair().AddInputPosition(new StructDefine.Position(i, j));
 						sheetReaders.get(currentSheetIndex).getCells()[i][j].setCellType(Cell.CELL_TYPE_FORMULA);
 						sheetReaders.get(currentSheetIndex).getCells()[i][j].setFormula(inputFormulas.get(index));
@@ -1087,10 +1092,30 @@ public class MainUI extends JFrame {
 				textArea_repairAdvise.setText("");
 				clearColor(smellColors);
 				
+				WaitDialog waitDialog = new WaitDialog(2);
+				waitDialog.setAlwaysOnTop(true);
+				waitDialog.setLocationRelativeTo(getParent());
+				waitDialog.setResizable(false);
+				waitDialog.setVisible(true);
+				waitDialog.update(waitDialog.getGraphics());
+				
 				table_smell.clearSelection();
 				for(int i = 0 ; i < detectRepairSmells.size() ; i++) {
+					DetectRepairSmell drs = detectRepairSmells.get(i);
+					boolean recovery = drs.recovery();
+					if(!recovery) {
+						drs.synthesize();
+					}
+					try {
+						drs.repairSmell();
+					} catch (Exception e1) {
+						e1.printStackTrace();
+					}
+					
 					applyRepairSmell(i);
 				}
+				
+				waitDialog.setVisible(false);
 			}
 		});
 		panel_saveToFile.add(btn_applyAll);
