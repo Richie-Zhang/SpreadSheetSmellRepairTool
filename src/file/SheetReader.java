@@ -67,8 +67,12 @@ public class SheetReader {
 								cell.getStringCellValue();
 								this.cells[i][j].setValueType(1);
 							} catch(IllegalStateException e2){
-								cell.getBooleanCellValue();
-								this.cells[i][j].setValueType(2);
+								try{
+									cell.getBooleanCellValue();
+									this.cells[i][j].setValueType(2);
+								} catch(IllegalStateException e3){
+									
+								}
 							}
 						}
 						break;

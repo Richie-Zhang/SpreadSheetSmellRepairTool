@@ -234,7 +234,9 @@ public class ExtractCellArray {
     }
     
     private int formulaInputType(StructDefine.Position pos) {	//return the type of formula's input, 1-only the same column; 2-only the same row; 3-other
-        String sFormula = sheetReader.getCells()[pos.GetRow()][pos.GetColumn()].getFormula();
+        StructDefine.Cell cell= sheetReader.getCells()[pos.GetRow()][pos.GetColumn()];
+        if(cell.getValueType() != 0) return -1;
+    	String sFormula = cell.getFormula();
         if(sFormula == null) return 0;
         Formula formula = new Formula(pos, sFormula);
         ArrayList<StructDefine.R1C1Relative> InputSet = formula.GetInputSet();

@@ -105,6 +105,7 @@ public class AutoDetectUI extends JFrame {
 			}
 		});
 		panel_open.add(btn_detect);
+		btn_detect.setEnabled(false);
 		
 		JPanel panel_allFiles = new JPanel();
 		contentPane.add(panel_allFiles, BorderLayout.WEST);

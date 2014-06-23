@@ -141,11 +141,13 @@ public class StructDefine {
         }
 
 		public int compareTo(R1C1Relative o) {
+			if(o == null) return 0;
 			if(row != o.row) return row-o.row;
 			else return column-o.column;
 		}
 		
 		public boolean equal(R1C1Relative o) {
+			if(o == null) return false;
 			if(row == o.row && column == o.column) return true;
 			else return false;
 		}

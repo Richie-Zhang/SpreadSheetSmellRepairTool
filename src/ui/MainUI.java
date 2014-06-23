@@ -62,6 +62,8 @@ public class MainUI extends JFrame {
 	private JTabbedPane tabbedPane;
 	private JTextArea textArea_repairAdvise;
 	private JButton button_ignore, button_apply, button_manualUpdate;
+	private JButton btn_selectAllSnippet, btn_unselectAllSnippet, btn_addSnippet, btn_deleteSnippet, btn_alterSnippet, btn_submitSnippet;
+	private JButton btn_selectAllCellArray, btn_unselectAllCellArray, btn_addCellArray, btn_deleteCellArray, btn_alterCellArray, btn_submitCellArray;
 	
 	private ArrayList<SheetReader> sheetReaders = new ArrayList<>();
 	private ArrayList<ExtractCellArray> extractCellArrays = new ArrayList<>();
@@ -94,6 +96,7 @@ public class MainUI extends JFrame {
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setSize(1350, 700); 
 		setLocationRelativeTo(null);
+		setTitle("AmCheck");
 
 		JPanel contentPane = new JPanel();
 		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
@@ -115,6 +118,8 @@ public class MainUI extends JFrame {
 		splitPane.setBorder(null);
 		
 		contentPane.add(splitPane, BorderLayout.CENTER);
+		
+		clearSnippets();
 	}
 	
 	private JPanel createOpenFilePanel() {
@@ -277,13 +282,13 @@ public class MainUI extends JFrame {
 		tabbedPane.addTab("Snippets", snippetPanel);
 		JPanel cellArrayPanel = createCellArrayPanel();
 		tabbedPane.addTab("Cell arrays", cellArrayPanel);
-		JPanel smellPanel = createSmellPanel();
-		tabbedPane.addTab("Smells or errors", smellPanel);
+		JPanel smellRepairPanel = createSmellRepairPanel();
+		tabbedPane.addTab("Smells or errors", smellRepairPanel);
 		tabbedPane.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent arg0) {
 				table.updateUI();
 			}
-		});
+		});	
 		
 		return tabbedPanel;
 	}
@@ -306,31 +311,22 @@ public class MainUI extends JFrame {
 				table_snippet.clearSelection();
 				clearColor(snippetColors);
 				clearCellArrays();
+				btn_selectAllSnippet.setEnabled(true);
+				btn_unselectAllSnippet.setEnabled(true);
+				btn_addSnippet.setEnabled(true);
+				btn_deleteSnippet.setEnabled(true);
+				btn_alterSnippet.setEnabled(true);
+				btn_submitSnippet.setEnabled(true);
 			}
 		});
 		btn_identifySnippet.setBounds(0, 0, 115, 25);
 		panel_opSnippet.add(btn_identifySnippet);
 		
-		JButton btn_selectAllSnippet = new JButton("Select all");
-		btn_selectAllSnippet.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				if(currentSheetIndex < 0) return;
-				MyTableModel tableModel = (MyTableModel) table_snippet.getModel();
-				int rowCount = tableModel.getRowCount();
-				for(int i = 0 ; i < rowCount ; i++) {
-					tableModel.setValueAt(new Boolean(true), i, 0);
-				}
-				table_snippet.setModel(tableModel);
-			}
-		});
-		btn_selectAllSnippet.setBounds(0, 120, 115, 25);
-		panel_opSnippet.add(btn_selectAllSnippet);
-		
 		JButton btn_loadMetadataSnippet = new JButton("Load meta");
 		btn_loadMetadataSnippet.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				if(currentSheetIndex < 0) return;
-				clearSnippets();
+				
 				try {
 					ArrayList<StructDefine.Region> snips = Metadata.loadMetadataSnippet(textField_fileName.getText(), currentSheetIndex);
 					if(snips == null)
@@ -339,7 +335,15 @@ public class MainUI extends JFrame {
 						JOptionPane.showMessageDialog(null, "The metadata file does not contain Snippet information !!");
 					else {
 						extractCellArrays.get(currentSheetIndex).setSnippets(snips);
+						clearSnippets();
 						updateSnippets();
+						
+						btn_selectAllSnippet.setEnabled(true);
+						btn_unselectAllSnippet.setEnabled(true);
+						btn_addSnippet.setEnabled(true);
+						btn_deleteSnippet.setEnabled(true);
+						btn_alterSnippet.setEnabled(true);
+						btn_submitSnippet.setEnabled(true);
 					}
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -364,7 +368,22 @@ public class MainUI extends JFrame {
 		btn_saveMetaSnippet.setBounds(0, 60, 115, 25);
 		panel_opSnippet.add(btn_saveMetaSnippet);
 		
-		JButton btn_unselectAllSnippet = new JButton("Clear all");
+		btn_selectAllSnippet = new JButton("Select all");
+		btn_selectAllSnippet.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				if(currentSheetIndex < 0) return;
+				MyTableModel tableModel = (MyTableModel) table_snippet.getModel();
+				int rowCount = tableModel.getRowCount();
+				for(int i = 0 ; i < rowCount ; i++) {
+					tableModel.setValueAt(new Boolean(true), i, 0);
+				}
+				table_snippet.setModel(tableModel);
+			}
+		});
+		btn_selectAllSnippet.setBounds(0, 120, 115, 25);
+		panel_opSnippet.add(btn_selectAllSnippet);
+		
+		btn_unselectAllSnippet = new JButton("Clear all");
 		btn_unselectAllSnippet.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -380,7 +399,7 @@ public class MainUI extends JFrame {
 		btn_unselectAllSnippet.setBounds(0, 150, 115, 25);
 		panel_opSnippet.add(btn_unselectAllSnippet);
 		
-		JButton btn_addSnippet = new JButton("Add");
+		btn_addSnippet = new JButton("Add");
 		btn_addSnippet.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -396,7 +415,8 @@ public class MainUI extends JFrame {
                 }
                 boolean addSuccess = extractCellArrays.get(currentSheetIndex).addSnippet(new StructDefine.Region(tlPosition, brPosition));
                 if(!addSuccess) {
-                	JOptionPane.showMessageDialog(null, "The input is not a valid Snippet, add failed!");
+                	JOptionPane.showMessageDialog(null, "The input is not a valid snippet, add failed ! \n "
+                			+ "Hint: The snippet cann't share the same cell with an existed snippet and every cell must have an numerical value or formula !");
                 	return;
                 }
                 
@@ -417,7 +437,7 @@ public class MainUI extends JFrame {
 		btn_addSnippet.setBounds(0, 180, 115, 25);
 		panel_opSnippet.add(btn_addSnippet);
 		
-		JButton btn_deleteSnippet = new JButton("Delete");
+		btn_deleteSnippet = new JButton("Delete");
 		btn_deleteSnippet.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -440,7 +460,7 @@ public class MainUI extends JFrame {
 		btn_deleteSnippet.setBounds(0, 210, 115, 25);
 		panel_opSnippet.add(btn_deleteSnippet);
 		
-		JButton btn_alterSnippet = new JButton("Alter");
+		btn_alterSnippet = new JButton("Alter");
 		btn_alterSnippet.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -492,7 +512,7 @@ public class MainUI extends JFrame {
 		btn_alterSnippet.setBounds(0, 240, 115, 25);
 		panel_opSnippet.add(btn_alterSnippet);
 		
-		JButton btn_submitSnippet = new JButton("Confirm");
+		btn_submitSnippet = new JButton("Confirm");
 		btn_submitSnippet.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -500,6 +520,15 @@ public class MainUI extends JFrame {
 				
 				extractCellArrays.get(currentSheetIndex).extractCellArrays();
 				updateCellArrays();
+				
+				btn_selectAllCellArray.setEnabled(true);
+				btn_unselectAllCellArray.setEnabled(true);
+				btn_addCellArray.setEnabled(true);
+				btn_deleteCellArray.setEnabled(true);
+				btn_alterCellArray.setEnabled(true);
+				btn_submitCellArray.setEnabled(true);
+				
+				tabbedPane.setEnabledAt(1, true);
 			}
 		});
 		btn_submitSnippet.setBounds(0, 310, 115, 25);
@@ -537,6 +566,7 @@ public class MainUI extends JFrame {
 		table_snippet.getSelectionModel().addListSelectionListener(new ListSelectionListener(){
 			public void valueChanged(ListSelectionEvent e){
 				if(e.getValueIsAdjusting()) return;
+				if(table_snippet.getSelectedRow() < 0) return;
 				ArrayList<StructDefine.Region> snippets = extractCellArrays.get(currentSheetIndex).getSnippets();
 				for(int i = 0 ; i < table_snippet.getRowCount() ; i++)
 					if((Boolean)table_snippet.getValueAt(i, 0))
@@ -566,7 +596,7 @@ public class MainUI extends JFrame {
 		panel_opCellArray.setLayout(null);
 		panel_opCellArray.setPreferredSize(new Dimension(120, HEIGHT));
 		
-		JButton btn_extractCellArray = new JButton("Extract");
+		/*JButton btn_extractCellArray = new JButton("Extract");
 		btn_extractCellArray.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				if(currentSheetIndex < 0) return;
@@ -575,16 +605,23 @@ public class MainUI extends JFrame {
 				table_cellArray.clearSelection();
 				clearColor(cellArrayColors);
 				clearSmells();
+				
+				btn_selectAllCellArray.setEnabled(true);
+				btn_unselectAllCellArray.setEnabled(true);
+				btn_addCellArray.setEnabled(true);
+				btn_deleteCellArray.setEnabled(true);
+				btn_alterCellArray.setEnabled(true);
+				btn_submitCellArray.setEnabled(true);
 			}
 		});
 		btn_extractCellArray.setBounds(0, 0, 115, 25);
-		panel_opCellArray.add(btn_extractCellArray);
+		panel_opCellArray.add(btn_extractCellArray);*/
 		
 		JButton btn_loadMetadataCellArray = new JButton("Load meta");
 		btn_loadMetadataCellArray.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
-				clearCellArrays();
+				
 				try {
 					ArrayList<StructDefine.Region> cas = Metadata.loadMetadataCellArray(textField_fileName.getText(), currentSheetIndex);
 					if(cas == null)
@@ -593,13 +630,19 @@ public class MainUI extends JFrame {
 						JOptionPane.showMessageDialog(null, "The metadata file does not contain Snippet information !!");
 					else {
 						extractCellArrays.get(currentSheetIndex).setCellArrays(cas);
+						clearCellArrays();
 						updateCellArrays();
+						
+						btn_selectAllCellArray.setEnabled(true);
+						btn_unselectAllCellArray.setEnabled(true);
+						btn_addCellArray.setEnabled(true);
+						btn_deleteCellArray.setEnabled(true);
+						btn_alterCellArray.setEnabled(true);
+						btn_submitCellArray.setEnabled(true);
 					}
 				} catch (IOException e1) {
 					e1.printStackTrace();
 				}
-				
-				clearSmells();
 			}
 		});
 		btn_loadMetadataCellArray.setBounds(0, 30, 115, 25);
@@ -620,7 +663,7 @@ public class MainUI extends JFrame {
 		btn_saveMetaCellArray.setBounds(0, 60, 115, 25);
 		panel_opCellArray.add(btn_saveMetaCellArray);
 		
-		JButton btn_selectAllCellArray = new JButton("Select all");
+		btn_selectAllCellArray = new JButton("Select all");
 		btn_selectAllCellArray.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -635,7 +678,7 @@ public class MainUI extends JFrame {
 		btn_selectAllCellArray.setBounds(0, 120, 115, 25);
 		panel_opCellArray.add(btn_selectAllCellArray);
 		
-		JButton btn_unselectAllCellArray = new JButton("Clear all");
+		btn_unselectAllCellArray = new JButton("Clear all");
 		btn_unselectAllCellArray.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -651,7 +694,7 @@ public class MainUI extends JFrame {
 		btn_unselectAllCellArray.setBounds(0, 150, 115, 25);
 		panel_opCellArray.add(btn_unselectAllCellArray);
 		
-		JButton btn_addCellArray = new JButton("Add");
+		btn_addCellArray = new JButton("Add");
 		btn_addCellArray.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -668,7 +711,8 @@ public class MainUI extends JFrame {
                 boolean addSuccess = extractCellArrays.get(currentSheetIndex).addCellArray(new StructDefine.Region(tlPosition, brPosition));
                 
                 if(!addSuccess) {
-                	JOptionPane.showMessageDialog(null, "The input is not a valid Cell Array, add failed!");
+                	JOptionPane.showMessageDialog(null, "The input is not a valid cell array, add failed ! \n "
+                			+ "Hint: The cell array cann't share the same cell with an existed cell array and every cell must have an numerical value or formula !");
                 	return;
                 }
                 
@@ -689,7 +733,7 @@ public class MainUI extends JFrame {
 		btn_addCellArray.setBounds(0, 180, 115, 25);
 		panel_opCellArray.add(btn_addCellArray);
 		
-		JButton btn_deleteCellArray = new JButton("Delete");
+		btn_deleteCellArray = new JButton("Delete");
 		btn_deleteCellArray.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -713,7 +757,7 @@ public class MainUI extends JFrame {
 		btn_deleteCellArray.setBounds(0, 210, 115, 25);
 		panel_opCellArray.add(btn_deleteCellArray);
 		
-		JButton btn_alterCellArray = new JButton("Alter");
+		btn_alterCellArray = new JButton("Alter");
 		btn_alterCellArray.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -764,7 +808,7 @@ public class MainUI extends JFrame {
 		btn_alterCellArray.setBounds(0, 240, 115, 25);
 		panel_opCellArray.add(btn_alterCellArray);
 		
-		JButton btn_submitCellArray = new JButton("Confirm");
+		btn_submitCellArray = new JButton("Confirm");
 		btn_submitCellArray.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if(currentSheetIndex < 0) return;
@@ -782,6 +826,7 @@ public class MainUI extends JFrame {
 				}
 				
 				tabbedPane.setSelectedIndex(2);
+				tabbedPane.setEnabledAt(2, true);
 				updateSmells();
 			}
 		});
@@ -822,6 +867,7 @@ public class MainUI extends JFrame {
 			public void valueChanged(ListSelectionEvent e){
 				if(currentSheetIndex < 0) return;
 				if(e.getValueIsAdjusting()) return;
+				if(table_cellArray.getSelectedRow() < 0) return;
 				ArrayList<StructDefine.Region> snippets = extractCellArrays.get(currentSheetIndex).getCellArrays();
 				for(int i = 0 ; i < table_cellArray.getRowCount() ; i++)
 					if((Boolean)table_cellArray.getValueAt(i, 0))
@@ -842,20 +888,33 @@ public class MainUI extends JFrame {
 		return cellArrayPanel;
 	}
 
+	private JPanel createSmellRepairPanel() {
+		JPanel smellRepairPanel = new JPanel();
+		smellRepairPanel.setLayout(new BorderLayout(0, 0));
+		
+		JPanel smellPanel = createSmellPanel();
+		JPanel repairJPanel = createRepairPanel();
+		
+		JSplitPane splitPane = new JSplitPane();
+		splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, smellPanel, repairJPanel);
+		splitPane.setDividerLocation(200);
+		splitPane.setResizeWeight(1.0);
+		splitPane.setBorder(null);
+		
+		smellRepairPanel.add(splitPane, BorderLayout.CENTER);
+		
+		return smellRepairPanel;
+	}
+	
 	private JPanel createSmellPanel() {
-		JPanel smellPanel = new JPanel();
-		
-		smellPanel.setLayout(new BorderLayout(0, 5));
-		
 		JPanel panel_detectSmell = new JPanel();
-		smellPanel.add(panel_detectSmell, BorderLayout.NORTH);
 		panel_detectSmell.setLayout(new BorderLayout(0, 5));
 		JLabel label_smellList = new JLabel("Cell arrays with smells or errors");
 		panel_detectSmell.add(label_smellList, BorderLayout.NORTH);
 		
 		JScrollPane scrollPane_smell = new JScrollPane();
 		panel_detectSmell.add(scrollPane_smell, BorderLayout.CENTER);
-		scrollPane_smell.setPreferredSize(new Dimension(WIDTH, 180));
+		//scrollPane_smell.setPreferredSize(new Dimension(WIDTH, 200));
 		
 		String[] headers = {"Upper left", "Lower right", "Stage"};
 		DefaultTableModel model = new DefaultTableModel(null, headers);
@@ -873,6 +932,30 @@ public class MainUI extends JFrame {
 			public void valueChanged(ListSelectionEvent e) {
 				if(currentSheetIndex < 0) return;
 				if(e.getValueIsAdjusting()) return;
+				textArea_repairAdvise.setText("");
+				clearColor(smellColors);
+				
+				int row = table_smell.getSelectedRow();
+				if(row < 0) return;
+				
+				button_apply.setEnabled(false);
+				button_ignore.setEnabled(false);
+				button_manualUpdate.setEnabled(false);
+				
+				DetectRepairSmell drs = detectRepairSmells.get(row);
+				
+				setColor(smellColors, drs.getCellArray(), Color.LIGHT_GRAY);
+			}
+		});
+		scrollPane_smell.setViewportView(table_smell);
+		
+		JPanel panel_advise = new JPanel();
+		panel_advise.setLayout(new FlowLayout(FlowLayout.RIGHT));
+		
+		JButton adviseButton = new JButton("Generate repair advise");
+		adviseButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				if(currentSheetIndex < 0) return;
 				textArea_repairAdvise.setText("");
 				clearColor(smellColors);
 				
@@ -960,10 +1043,19 @@ public class MainUI extends JFrame {
 				}
 			}
 		});
-		scrollPane_smell.setViewportView(table_smell);
+		panel_advise.add(adviseButton);
+		
+		panel_detectSmell.add(panel_advise, BorderLayout.SOUTH);
+		return panel_detectSmell;
+	}
+	
+	private JPanel createRepairPanel() {
+		JPanel repairPanel = new JPanel();
+		
+		repairPanel.setLayout(new BorderLayout(0, 5));
 		
 		JPanel panel_repairAdvise = new JPanel();
-		smellPanel.add(panel_repairAdvise, BorderLayout.CENTER);
+		repairPanel.add(panel_repairAdvise, BorderLayout.CENTER);
 		panel_repairAdvise.setLayout(new BorderLayout(0, 5));
 		
 		JLabel lable_repair = new JLabel("Repairing options");
@@ -1083,7 +1175,7 @@ public class MainUI extends JFrame {
 		
 		JPanel panel_saveToFile = new JPanel();
 		panel_saveToFile.setLayout(new FlowLayout(FlowLayout.RIGHT));
-		smellPanel.add(panel_saveToFile, BorderLayout.SOUTH);
+		repairPanel.add(panel_saveToFile, BorderLayout.SOUTH);
 		
 		JButton btn_applyAll = new JButton("Apply all");
 		btn_applyAll.addActionListener(new ActionListener() {
@@ -1137,7 +1229,7 @@ public class MainUI extends JFrame {
 		});
 		panel_saveToFile.add(btn_saveToFile);
 		
-		return smellPanel;
+		return repairPanel;
 	}
 	
 	private void loadSheetList() {
@@ -1222,6 +1314,15 @@ public class MainUI extends JFrame {
 
 		clearColor(snippetColors);
 		clearCellArrays();
+		
+		btn_selectAllSnippet.setEnabled(false);
+		btn_unselectAllSnippet.setEnabled(false);
+		btn_addSnippet.setEnabled(false);
+		btn_deleteSnippet.setEnabled(false);
+		btn_alterSnippet.setEnabled(false);
+		btn_submitSnippet.setEnabled(false);
+		
+		tabbedPane.setEnabledAt(1, false);
 	}
 	
 	private void updateCellArrays() {
@@ -1251,6 +1352,15 @@ public class MainUI extends JFrame {
 		
 		clearColor(cellArrayColors);
 		clearSmells();
+		
+		btn_selectAllCellArray.setEnabled(false);
+		btn_unselectAllCellArray.setEnabled(false);
+		btn_addCellArray.setEnabled(false);
+		btn_deleteCellArray.setEnabled(false);
+		btn_alterCellArray.setEnabled(false);
+		btn_submitCellArray.setEnabled(false);
+		
+		tabbedPane.setEnabledAt(2, false);
 	}
 	
 	private void setColor(Color[][] colors, StructDefine.Region snip, Color color){

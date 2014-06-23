@@ -22,6 +22,7 @@ public class Formula {
 
     public String convertToR1C1(StructDefine.Position pos, String A1) {
     	A1 = A1.replaceAll(" ", "");
+    	if(A1.startsWith("+")) A1 = A1.substring(1);
         int row = pos.GetRow(), column = pos.GetColumn();
         String result = "";
         int length = A1.length(), index = 0;

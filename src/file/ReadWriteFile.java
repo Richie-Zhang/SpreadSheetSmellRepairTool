@@ -26,6 +26,8 @@ public class ReadWriteFile {
 		else if(filename.endsWith(".xls")) {
 			workbook = new HSSFWorkbook(input);
 		}
+		
+		if(workbook == null) System.err.println("Read file failed !");
 
 		int sheetNum = workbook.getNumberOfSheets();
 		
