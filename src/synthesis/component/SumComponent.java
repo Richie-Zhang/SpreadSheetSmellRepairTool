@@ -1,38 +1,43 @@
 package synthesis.component;
 
-import java.util.ArrayList;
+import synthesis.basic.IOType;
+import synthesis.basic.Type;
+import synthesis.basic.VarType;
 
-import choco.Choco;
-import choco.kernel.model.variables.integer.IntegerExpressionVariable;
-import choco.kernel.model.variables.integer.IntegerVariable;
+import com.microsoft.z3.ArithExpr;
+import com.microsoft.z3.IntExpr;
+import com.microsoft.z3.Z3Exception;
 
 public final class SumComponent extends Component {
+
 	int num = 0;
 
 	public SumComponent(int num) {
 		this.num = num;
+		type = Components.SUM;
+		compId++;
 
-		id = Components.SUM;
-
-		inputs = new ArrayList<IntegerVariable>();
+		Type inType = new Type(IOType.COMP_INPUT, VarType.INTEGER);
+		Type outType = new Type(IOType.COMP_OUTPUT, VarType.INTEGER);
 		for (int i = 0; i < num; i++) {
-			inputs.add(Choco.makeIntVar("sum_para_" + i));
+			varTypes.add(inType);
 		}
+		varTypes.add(outType);
+	}
 
-		output = Choco.makeIntVar("sum_result");
+	public void init() throws Z3Exception {
+		super.init();
 
 		if (num < 2) {
-			spec = Choco.eq(inputs.get(0), output);
+			spec = ctx.mkEq(variables.get(0), variables.get(1));
 		} else {
-			IntegerExpressionVariable temp = Choco.plus(inputs.get(0),
-					inputs.get(1));
+			ArithExpr sum = ctx.mkAdd((IntExpr) variables.get(0),
+					(IntExpr) variables.get(1));
 			for (int i = 2; i < num; i++) {
-				temp = Choco.plus(temp, inputs.get(i));
+				sum = ctx.mkAdd(sum, (IntExpr) variables.get(i));
 			}
-			spec = Choco.eq(temp, output);
+			spec = ctx.mkEq(sum, variables.get(num));
 		}
-
-		canSwap = true;
 	}
 
 	public int getNum() {

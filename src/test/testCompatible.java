@@ -2,16 +2,15 @@ package test;
 
 import java.util.ArrayList;
 
+import com.microsoft.z3.ArithExpr;
+import com.microsoft.z3.Context;
+import com.microsoft.z3.Solver;
+import com.microsoft.z3.Status;
+import com.microsoft.z3.Z3Exception;
+
 import parser.ConvertFormula;
 import parser.FormulaParser;
-import choco.Choco;
-import choco.cp.model.CPModel;
-import choco.cp.solver.CPSolver;
-import choco.kernel.model.Model;
-import choco.kernel.model.constraints.Constraint;
-import choco.kernel.model.variables.integer.IntegerExpressionVariable;
-import choco.kernel.model.variables.integer.IntegerVariable;
-import choco.kernel.solver.Solver;
+import synthesis.util.Z3Util;
 import core.Formula;
 import core.StructDefine;
 
@@ -19,7 +18,7 @@ public class testCompatible {
 	private ArrayList<StructDefine.R1C1Relative> IV;
 	private ArrayList<StructDefine.Function> FUNC;
 	
-	public static void main(String [] args) {
+	public static void main(String [] args) throws Z3Exception {
 		ArrayList<StructDefine.R1C1Relative> iv = new ArrayList<>();
 		ArrayList<StructDefine.Function> func = new ArrayList<>();
 		iv.add(new StructDefine.R1C1Relative(0, -2));
@@ -57,7 +56,7 @@ public class testCompatible {
 		FUNC = func;
 	}
 	
-	public ArrayList<ArrayList<StructDefine.Function>> classify() {
+	public ArrayList<ArrayList<StructDefine.Function>> classify() throws Z3Exception {
 		ArrayList<ArrayList<StructDefine.Function>> groups = new ArrayList<>();
 		int index = 0;
 		while(index != -1) {
@@ -86,35 +85,29 @@ public class testCompatible {
 		return groups;
 	}
 	
-	private boolean isCompatible(StructDefine.Function func1, StructDefine.Function func2) {
-		ArrayList<IntegerVariable> varsTable = new ArrayList<>();
+	private boolean isCompatible(StructDefine.Function func1, StructDefine.Function func2) throws Z3Exception {
+		Context ctx = Z3Util.getContext();
+		Solver solver = ctx.mkSolver();
+		
+		ArrayList<ArithExpr> varsTable = new ArrayList<>();
 		for(int i = 0 ; i < IV.size() ; i++) {
-			varsTable.add(Choco.makeIntVar("i"+i));
+			varsTable.add(ctx.mkIntConst("i"+i));
 		}
 		
 		System.out.println(func1.getFunc() + func2.getFunc());
 		
 		ConvertFormula convertFormula = new ConvertFormula();
-		IntegerExpressionVariable iev1 = convertFormula.convertFormula(func1.getFunc(), varsTable);
-		IntegerExpressionVariable iev2 = convertFormula.convertFormula(func2.getFunc(), varsTable);
+		ArithExpr iev1 = convertFormula.convertFormula(func1.getFunc(), varsTable, ctx);
+		ArithExpr iev2 = convertFormula.convertFormula(func2.getFunc(), varsTable, ctx);
 		
-		Constraint cons = Choco.neq(iev1, iev2);
-		
-		Model model = new CPModel();
-		Solver solver = new CPSolver();
-		
-		model.addConstraint(cons);
+		solver.add(ctx.mkNot(ctx.mkEq(iev1, iev2)));;
 		
 		for(int i = 0 ; i < IV.size() ; i++) {
 			if(!func1.getFunc().contains("i"+i) || !func2.getFunc().contains("i"+i))
-				model.addConstraint(Choco.eq(0, varsTable.get(i)));
+				solver.add(ctx.mkEq(ctx.mkInt(0), varsTable.get(i)));
 		}
 		
-		solver.read(model);
-		solver.setTimeLimit(180000);
-		solver.solve();
-		
-		if (solver.getSolutionCount() > 0) {
+		if (Status.SATISFIABLE == solver.check()) {
 			return false;
 		} else {
 			return true;

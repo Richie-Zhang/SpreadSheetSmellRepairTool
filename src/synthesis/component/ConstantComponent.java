@@ -1,19 +1,25 @@
 package synthesis.component;
 
-import java.util.ArrayList;
+import synthesis.basic.IOType;
+import synthesis.basic.Type;
+import synthesis.basic.VarType;
 
-import choco.Choco;
-import choco.kernel.model.variables.integer.IntegerVariable;
+import com.microsoft.z3.Z3Exception;
 
 public final class ConstantComponent extends Component {
+
 	public ConstantComponent() {
-		id = Components.CONSTANT;
-		
-		inputs = new ArrayList<IntegerVariable>();
+		type = Components.CONSTANT;
+		compId++;
 
-		output = Choco.makeIntVar("constant_result");
+		Type outType = new Type(IOType.COMP_OUTPUT, VarType.INTEGER);
+		varTypes.add(outType);
+	}
 
-		spec = Choco.TRUE;
+	public void init() throws Z3Exception {
+		super.init();
+
+		spec = ctx.mkBool(true);
 	}
 
 	public String getProg(String[] paras) {

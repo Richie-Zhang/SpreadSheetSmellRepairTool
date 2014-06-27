@@ -5,10 +5,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Stack;
 
-import choco.Choco;
-import choco.kernel.model.variables.integer.IntegerConstantVariable;
-import choco.kernel.model.variables.integer.IntegerExpressionVariable;
-import choco.kernel.model.variables.integer.IntegerVariable;
+import com.microsoft.z3.ArithExpr;
+import com.microsoft.z3.Context;
+import com.microsoft.z3.Z3Exception;
+
 
 public class ConvertFormula {
 	final Map<Character, Integer> isp = new HashMap<>();
@@ -31,9 +31,9 @@ public class ConvertFormula {
 		icp.put(')', 1);
 	}
 	
-	public IntegerExpressionVariable convertFormula(String expression, ArrayList<IntegerVariable> varsTable) {
+	public ArithExpr convertFormula(String expression, ArrayList<ArithExpr> varsTable, Context ctx) throws Z3Exception {
 		expression += "#";
-		Stack<IntegerExpressionVariable> vars = new Stack<>();
+		Stack<ArithExpr> vars = new Stack<>();
 		Stack<Character> s = new Stack<>();
 		int index = 0;
 		s.push('#');
@@ -48,7 +48,7 @@ public class ConvertFormula {
 					if(index == expression.length()) continue;
 					ch = expression.charAt(index);
 				}
-				IntegerConstantVariable tempInt = new IntegerConstantVariable(Integer.parseInt(temp));//++++++++++++++
+				ArithExpr tempInt = ctx.mkInt(Integer.parseInt(temp));
 				vars.push(tempInt);
 			}
 			else if(ch == 'i') {
@@ -60,7 +60,7 @@ public class ConvertFormula {
 					if(index == expression.length()) continue;
 					ch = expression.charAt(index);
 				}
-				IntegerVariable iv = varsTable.get(Integer.parseInt(temp)); //+++++++++++++++++++++
+				ArithExpr iv = varsTable.get(Integer.parseInt(temp)); //+++++++++++++++++++++
 				vars.push(iv);
 			}
 			else if(ch == 'S' || ch == 's') {
@@ -68,22 +68,22 @@ public class ConvertFormula {
 				int endIndex = expression.indexOf(")", startIndex); //"}"
 				String temp = expression.substring(startIndex, endIndex);
 				String[] items = temp.split(",");
-				ArrayList<IntegerExpressionVariable> sumItems = new ArrayList<>();
+				ArrayList<ArithExpr> sumItems = new ArrayList<>();
 				for(String item : items) {
 					if(item.startsWith("i")) {
 						int k = Integer.parseInt(item.substring(1));
 						sumItems.add(varsTable.get(k));
 					}
 					else {
-						sumItems.add(new IntegerConstantVariable(Integer.parseInt(item)));
+						sumItems.add(ctx.mkInt(Integer.parseInt(temp)));
 					}
 				}
 				if(sumItems.size() == 1)
 					vars.push(sumItems.get(0));
 				else {
-					IntegerExpressionVariable iev = Choco.plus(sumItems.get(0), sumItems.get(1));
+					ArithExpr iev = ctx.mkAdd(sumItems.get(0), sumItems.get(1));
 					for(int i = 2 ; i < sumItems.size() ; i++) {
-						iev = Choco.plus(iev, sumItems.get(i));
+						iev = ctx.mkAdd(iev, sumItems.get(i));
 					}
 					vars.push(iev);
 				}
@@ -97,17 +97,17 @@ public class ConvertFormula {
 				}
 				else if(isp.get(top) > icp.get(ch)) {
 					char op = s.pop();
-					IntegerExpressionVariable op2 = vars.pop();
-					IntegerExpressionVariable op1 = vars.pop();
-					IntegerExpressionVariable result = null;
+					ArithExpr op2 = vars.pop();
+					ArithExpr op1 = vars.pop();
+					ArithExpr result = null;
 					if(op == '+') {
-						result = Choco.plus(op1, op2);
+						result = ctx.mkAdd(op1, op2);
 					}
 					else if(op == '-') {
-						result = Choco.minus(op1, op2);
+						result = ctx.mkSub(op1, op2);
 					}
 					else if(op == '*') {
-						result = Choco.mult(op1, op2);
+						result = ctx.mkMul(op1, op2);
 					}
 					if(result != null)
 						vars.push(result);

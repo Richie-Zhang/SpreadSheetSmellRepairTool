@@ -3,20 +3,21 @@ package parser;
 import java.util.ArrayList;
 import java.util.Collections;
 
-import choco.Choco;
-import choco.cp.model.CPModel;
-import choco.cp.solver.CPSolver;
-import choco.kernel.model.Model;
-import choco.kernel.model.constraints.Constraint;
-import choco.kernel.model.variables.integer.IntegerExpressionVariable;
-import choco.kernel.model.variables.integer.IntegerVariable;
-import choco.kernel.solver.Solver;
+import synthesis.util.Z3Util;
+
+import com.microsoft.z3.ArithExpr;
+import com.microsoft.z3.Context;
+import com.microsoft.z3.Solver;
+import com.microsoft.z3.Status;
+import com.microsoft.z3.Z3Exception;
+
 import core.Formula;
 import core.StructDefine;
 
 public class FormulaParser {
+	public static Context ctx = Z3Util.getContext();
 
-	public static boolean isEquivalent(Formula formula1, Formula formula2, ArrayList<StructDefine.R1C1Relative> IV) {
+	public static boolean isEquivalent(Formula formula1, Formula formula2, ArrayList<StructDefine.R1C1Relative> IV) throws Z3Exception {
 		String for1 = preProcessFormula(formula1.getR1C1Formula(), IV);
 		String for2 = preProcessFormula(formula2.getR1C1Formula(), IV);
 		
@@ -26,28 +27,20 @@ public class FormulaParser {
 		return isEquivalent(for1, for2, IV);
 	}
 	
-	public static boolean isEquivalent(String for1, String for2, ArrayList<StructDefine.R1C1Relative> IV) {
-		ArrayList<IntegerVariable> varsTable = new ArrayList<>();
+	public static boolean isEquivalent(String for1, String for2, ArrayList<StructDefine.R1C1Relative> IV) throws Z3Exception {
+		ArrayList<ArithExpr> varsTable = new ArrayList<>();
 		for(int i = 0 ; i < IV.size() ; i++) {
-			varsTable.add(Choco.makeIntVar("i"+i));
+			varsTable.add(ctx.mkIntConst("i"+i));
 		}
 		
 		ConvertFormula convertFormula = new ConvertFormula();
-		IntegerExpressionVariable iev1 = convertFormula.convertFormula(for1, varsTable);
-		IntegerExpressionVariable iev2 = convertFormula.convertFormula(for2, varsTable);
+		ArithExpr iev1 = convertFormula.convertFormula(for1, varsTable, ctx);
+		ArithExpr iev2 = convertFormula.convertFormula(for2, varsTable, ctx);
 		
-		Constraint cons = Choco.neq(iev1, iev2);
+		Solver solver = ctx.mkSolver();
+		solver.add(ctx.mkNot(ctx.mkEq(iev1, iev2)));
 		
-		Model model = new CPModel();
-		Solver solver = new CPSolver();
-		
-		model.addConstraint(cons);
-		
-		solver.read(model);
-		solver.setTimeLimit(180000);
-		solver.solve();
-		
-		if (solver.getSolutionCount() > 0) {
+		if (Status.SATISFIABLE == solver.check()) {
 			return false;
 		} else {
 			return true;

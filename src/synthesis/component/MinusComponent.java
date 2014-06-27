@@ -1,33 +1,43 @@
 package synthesis.component;
 
-import java.util.ArrayList;
+import synthesis.basic.IOType;
+import synthesis.basic.Type;
+import synthesis.basic.VarType;
 
-import choco.Choco;
-import choco.kernel.model.variables.integer.IntegerVariable;
+import com.microsoft.z3.IntExpr;
+import com.microsoft.z3.Z3Exception;
 
 public final class MinusComponent extends Component {
+
 	public MinusComponent() {
-		id = Components.MINUS;
-		
-		inputs = new ArrayList<IntegerVariable>();
-		for (int i = 0; i < 2; i++) {
-			inputs.add(Choco.makeIntVar("minus_para_" + i));
-		}
+		type = Components.MINUS;
+		compId++;
 
-		output = Choco.makeIntVar("minus_result");
+		Type inType = new Type(IOType.COMP_INPUT, VarType.INTEGER);
+		Type outType = new Type(IOType.COMP_OUTPUT, VarType.INTEGER);
+		varTypes.add(inType);
+		varTypes.add(inType);
+		varTypes.add(outType);
+	}
 
-		spec = Choco.eq(Choco.minus(inputs.get(0), inputs.get(1)), output);
+	public void init() throws Z3Exception {
+		super.init();
+
+		spec = ctx.mkEq(
+				ctx.mkAdd((IntExpr) variables.get(0),
+						ctx.mkUnaryMinus((IntExpr) variables.get(1))),
+				variables.get(2));
 	}
 
 	public String getProg(String[] paras) {
-		return paras[0] + "-" + paras[1];
+		return paras[0] + " - " + paras[1];
 	}
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj instanceof MinusComponent){
+		if (obj instanceof MinusComponent) {
 			return true;
-		} 
+		}
 		return false;
 	}
 }

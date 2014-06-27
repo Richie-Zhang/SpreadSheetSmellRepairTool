@@ -1,34 +1,41 @@
 package synthesis.component;
 
-import java.util.ArrayList;
+import synthesis.basic.IOType;
+import synthesis.basic.Type;
+import synthesis.basic.VarType;
 
-import choco.Choco;
-import choco.kernel.model.variables.integer.IntegerVariable;
+import com.microsoft.z3.IntExpr;
+import com.microsoft.z3.Z3Exception;
 
 public final class PlusComponent extends Component {
+
 	public PlusComponent() {
-		id = Components.PLUS;
-		
-		inputs = new ArrayList<IntegerVariable>();
-		for (int i = 0; i < 2; i++) {
-			inputs.add(Choco.makeIntVar("plus_para_" + i));
-		}
+		type = Components.PLUS;
+		compId++;
 
-		output = Choco.makeIntVar("plus_result");
+		Type inType = new Type(IOType.COMP_INPUT, VarType.INTEGER);
+		Type outType = new Type(IOType.COMP_OUTPUT, VarType.INTEGER);
+		varTypes.add(inType);
+		varTypes.add(inType);
+		varTypes.add(outType);
+	}
 
-		spec = Choco.eq(Choco.plus(inputs.get(0), inputs.get(1)), output);
-		
-		canSwap = true;
+	public void init() throws Z3Exception {
+		super.init();
+
+		spec = ctx.mkEq(
+				ctx.mkAdd((IntExpr) variables.get(0),
+						(IntExpr) variables.get(1)), variables.get(2));
 	}
 
 	public String getProg(String[] paras) {
-		return paras[0] + "+" + paras[1];
+		return paras[0] + " + " + paras[1];
 	}
 
 	public boolean equals(Object obj) {
-		if (obj instanceof PlusComponent){
+		if (obj instanceof PlusComponent) {
 			return true;
-		} 
+		}
 		return false;
 	}
 }

@@ -10,20 +10,23 @@ import java.util.Map.Entry;
 
 import org.apache.poi.ss.usermodel.Cell;
 
+import com.microsoft.z3.ArithExpr;
+import com.microsoft.z3.Context;
+import com.microsoft.z3.Solver;
+import com.microsoft.z3.Status;
+import com.microsoft.z3.Z3Exception;
+
+import core.StructDefine.Function;
 import parser.ConvertFormula;
 import parser.ExpParser;
 import parser.FormulaParser;
-import synthesis.IOPair;
 import synthesis.SpecSynthesis;
+import synthesis.basic.IOPair;
+import synthesis.basic.Lval2Prog;
+import synthesis.basic.ProgramAbstract;
+import synthesis.basic.Result;
 import synthesis.component.*;
-import choco.Choco;
-import choco.cp.model.CPModel;
-import choco.cp.solver.CPSolver;
-import choco.kernel.model.Model;
-import choco.kernel.model.constraints.Constraint;
-import choco.kernel.model.variables.integer.IntegerExpressionVariable;
-import choco.kernel.model.variables.integer.IntegerVariable;
-import choco.kernel.solver.Solver;
+import synthesis.util.Z3Util;
 import file.SheetReader;
 
 public class DetectRepairSmell {
@@ -34,9 +37,10 @@ public class DetectRepairSmell {
 	private ArrayList<StructDefine.R1C1Relative> IV;
 	private ArrayList<StructDefine.Function> FUNC;
 	private ArrayList<IOPair> IO;
-	private ArrayList<IntegerVariable> varsTable;
+	private ArrayList<ArithExpr> varsTable;
 	private StructDefine.SmellAndRepair smellAndRepair;
 	private Formula repairFormula;
+	private Context ctx = Z3Util.getContext();
 	
 	private int state;	//-1-无法合成，1-已有公式，2-合成成功, 3-已修复
 	
@@ -68,8 +72,12 @@ public class DetectRepairSmell {
     			else {
     				if(lastFormula.getR1C1Formula().equals(formula.getR1C1Formula()))
     					continue;
-    				if(!FormulaParser.isEquivalent(formula, lastFormula, IV))
-    					return true;
+					try {
+						if(!FormulaParser.isEquivalent(formula, lastFormula, IV))
+							return true;
+					} catch (Z3Exception e) {
+						e.printStackTrace();
+					}
     			}
     		}
     	}
@@ -158,7 +166,7 @@ public class DetectRepairSmell {
 	    		CA.add(new StructDefine.Position(i, j));
 	}
 	
-	private void initSPEC() {
+	private void initSPEC() throws Z3Exception {
 		Map<Formula, Integer> SPEC_Map = new HashMap<>();
 		for(StructDefine.Position position : CA){
 			StructDefine.Cell cell = sheetReader.getCells()[position.GetRow()][position.GetColumn()];
@@ -206,11 +214,11 @@ public class DetectRepairSmell {
 		
 		this.varsTable = new ArrayList<>();
 		for(int i = 0 ; i < IV.size() ; i++) {
-			varsTable.add(Choco.makeIntVar("i"+i));
+			varsTable.add(ctx.mkIntConst("i"+i));
 		}
 	}
 	
-	private void initFUNC() {
+	private void initFUNC() throws Z3Exception {
 		for(Entry<Formula, Integer> entry : SPEC){
 			Formula formula = entry.getKey();
 			String func = FormulaParser.preProcessFormula(formula.getR1C1Formula(), IV);
@@ -265,10 +273,13 @@ public class DetectRepairSmell {
 		int pert = 0;
 		StructDefine.Function F = null;
 		for(ArrayList<StructDefine.Function> group : groups) {
-			SpecSynthesis specSynthesis = new SpecSynthesis(group, varsTable);
 			ArrayList<Component> comps = getComponents();
-			ArrayList<IOPair> ioPairs = specSynthesis.doSpecSynthesis(comps);
-			String[] progs = specSynthesis.doIOSynthesis(ioPairs, IO, comps);
+			ArrayList<IOPair> ioPairs = SpecSynthesis.doSpecSynthesis(IV, comps, group);
+			Result result = SpecSynthesis.doIOSynthesis(IO, comps, IV, group, ioPairs);
+			
+			ProgramAbstract prog = new ProgramAbstract(comps, IV.size());
+	        prog.init();
+			String[] progs = Lval2Prog.tranform(result, prog, false);
 			
 			StructDefine.Function function = null;
 			if (progs == null) {
@@ -287,6 +298,7 @@ public class DetectRepairSmell {
 				pert = coverage;
 				F = function;
 			}
+			if(coverage == IO.size()) break;
 		}
 		System.out.println("out---synthesizeFormulaPattern");
 		if(F != null)
@@ -295,7 +307,8 @@ public class DetectRepairSmell {
 			return null;
 	}
 	
-	private ArrayList<ArrayList<StructDefine.Function>> classify() {
+	private ArrayList<ArrayList<StructDefine.Function>> classify() throws Z3Exception {
+		System.out.println("in---classify");
 		ArrayList<ArrayList<StructDefine.Function>> groups = new ArrayList<>();
 		if(FUNC.size() == 0) return groups;
 		int index = 0;
@@ -322,6 +335,7 @@ public class DetectRepairSmell {
 				}
 			}
 		}
+		System.out.println("out---classify");
 		return groups;
 	}
 	
@@ -340,28 +354,20 @@ public class DetectRepairSmell {
 		return coveredCells;
 	}
 	
-	private boolean isCompatible(StructDefine.Function func1, StructDefine.Function func2) {
+	private boolean isCompatible(StructDefine.Function func1, StructDefine.Function func2) throws Z3Exception {
 		ConvertFormula convertFormula = new ConvertFormula();
-		IntegerExpressionVariable iev1 = convertFormula.convertFormula(func1.getFunc(), varsTable);
-		IntegerExpressionVariable iev2 = convertFormula.convertFormula(func2.getFunc(), varsTable);
+		ArithExpr iev1 = convertFormula.convertFormula(func1.getFunc(), varsTable, ctx);
+		ArithExpr iev2 = convertFormula.convertFormula(func2.getFunc(), varsTable, ctx);
 		
-		Constraint cons = Choco.neq(iev1, iev2);
-		
-		Model model = new CPModel();
-		Solver solver = new CPSolver();
-		
-		model.addConstraint(cons);
+		Solver solver = ctx.mkSolver();
+		solver.add(ctx.mkNot(ctx.mkEq(iev1, iev2)));
 		
 		for(int i = 0 ; i < IV.size() ; i++) {
 			if(!func1.getFunc().contains("i"+i) || !func2.getFunc().contains("i"+i))
-				model.addConstraint(Choco.eq(0, varsTable.get(i)));
+				solver.add(ctx.mkEq(ctx.mkInt(0), varsTable.get(i)));
 		}
 		
-		solver.read(model);
-		solver.setTimeLimit(180000);
-		solver.solve();
-		
-		if (solver.getSolutionCount() > 0) {
+		if (Status.SATISFIABLE == solver.check()) {
 			return false;
 		} else {
 			return true;
@@ -369,7 +375,38 @@ public class DetectRepairSmell {
 	}
 	
 	private ArrayList<Component> getComponents() {
-		ArrayList<Integer> constants = new ArrayList<>(); 
+		int []count = new int[3];
+		for(StructDefine.Function function : FUNC) {
+			String func = function.getFunc();
+			count[0] += func.split("\\+").length-1;
+			count[1] += func.split("\\-").length-1;
+			count[2] += func.split("\\*").length-1;
+		}
+		
+		for(StructDefine.Function function1 : FUNC) {
+			for(StructDefine.Function function2 : FUNC) {
+				if(!hasCommonCells(function1, function2)) {
+					count[0]++;
+					count[1]++;
+					count[2]++;
+				}
+			}
+		}
+		System.err.print(count[0]);
+		System.err.print(count[1]);
+		System.err.print(count[2]);
+		
+		ArrayList<Component> comps = new ArrayList<Component>();
+		for(int i = 0 ; i < count[0] ; i++)
+			comps.add(new PlusComponent());
+		for(int i = 0 ; i < count[1] ; i++)
+			comps.add(new MinusComponent());
+		for(int i = 0 ; i < count[2] ; i++)
+			comps.add(new MultComponent());
+		
+		return comps;
+		
+		/*ArrayList<Integer> constants = new ArrayList<>(); 
 		boolean []exist = new boolean[5];
 		for(StructDefine.Function function : FUNC) {
 			String func = function.getFunc();
@@ -383,17 +420,25 @@ public class DetectRepairSmell {
 			}
 		}
 		ArrayList<Component> comps = new ArrayList<Component>();
-		for(int i = 0 ; i < constants.size() ; i++)
-			comps.add(new ConstantComponent());
+		//for(int i = 0 ; i < constants.size() ; i++)
+			//comps.add(new ConstantComponent());
 		for(int i = 1 ; i < IV.size() + constants.size() ; i++) {
 			if(exist[0]) {comps.add(new PlusComponent());}
 			if(exist[1]) {comps.add(new MinusComponent());}
 			if(exist[2]) {comps.add(new MultComponent());}
 		}
-		return comps;
+		return comps;*/
 	}
 	
-	private ArrayList<Integer> getConstantNum(String func) {
+	private boolean hasCommonCells(Function function1, Function function2) {
+		for(int i = 0 ; i < IV.size() ; i++) {
+			if(function1.getFunc().contains("i"+i) && function2.getFunc().contains("i"+i))
+				return true;
+		}
+		return false;
+	}
+	
+	/*private ArrayList<Integer> getConstantNum(String func) {
 		ArrayList<Integer> constants = new ArrayList<>();
 		String temp = func;
 		for(int i = 0 ; i < IV.size() ; i++) 
@@ -410,8 +455,8 @@ public class DetectRepairSmell {
 			constants.add(value);
 		}
 		return constants;
-	}
-	
+	}*/
+
 	private String mergeProgs(String[] progs) {
 		int lineCount = progs.length;
 		String program = null;
@@ -424,8 +469,16 @@ public class DetectRepairSmell {
 		}
 		while(index > 0) {
 			index--;
-			String left = progs[index].split(" ")[0];
-			String right = progs[index].split(" ")[2];
+			String left = progs[index].replaceAll(" ", "").split("=")[0];
+			String right = progs[index].replaceAll(" ", "").split("=")[1];
+			if(right.contains("*")) {
+				String[] tokens = right.split("\\*");
+				right = "(" + tokens[0] + ")*(" + tokens[1] + ")";
+			}
+			else if(right.contains("/")) {
+				String[] tokens = right.split("\\/");
+				right = "(" + tokens[0] + ")/(" + tokens[1] + ")";
+			}
 			program = program.replaceAll(left, right);
 		}
 		return program;
