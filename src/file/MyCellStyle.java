@@ -7,10 +7,12 @@ import core.StructDefine.Region;;
 public class MyCellStyle {
 	private Workbook wb;
 	private Sheet sheet;
+	private CellStyle cellStyle;
 	
 	public MyCellStyle(Workbook workbook, Sheet sheet) {
 		this.wb = workbook;
 		this.sheet = sheet;
+		this.cellStyle = wb.createCellStyle();;
 	}
 	
 	public void setCellBorder(Region snip, short border) {
@@ -19,7 +21,7 @@ public class MyCellStyle {
 
 		for(int i = tlRow ; i <= brRow ; i++) {
 			Cell cell = sheet.getRow(i).getCell(tlColumn);
-			CellStyle cellStyle = wb.createCellStyle();
+			
 			cellStyle.cloneStyleFrom(cell.getCellStyle());
 			cellStyle.setBorderLeft(border);
 			cell.setCellStyle(cellStyle);
@@ -33,7 +35,7 @@ public class MyCellStyle {
 		
 		for(int i = tlColumn ; i <= brColumn ; i++) {
 			Cell cell = sheet.getRow(tlRow).getCell(i);
-			CellStyle cellStyle = wb.createCellStyle();
+			
 			cellStyle.cloneStyleFrom(cell.getCellStyle());
 			cellStyle.setBorderTop(border);
 			cell.setCellStyle(cellStyle);
@@ -48,7 +50,7 @@ public class MyCellStyle {
 
 	public void setCellColor(Position pos, short color) {
 		Cell cell = sheet.getRow(pos.GetRow()).getCell(pos.GetColumn());
-		CellStyle cellStyle = wb.createCellStyle();
+		
 		cellStyle.cloneStyleFrom(cell.getCellStyle());
 		cellStyle.setFillForegroundColor(color);
 		cellStyle.setFillPattern(CellStyle.SOLID_FOREGROUND);
@@ -61,7 +63,7 @@ public class MyCellStyle {
 		for(int i = tlRow ; i <= brRow ; i++)
 			for(int j = tlColumn ; j <= brColumn ; j++) {
 				Cell cell = sheet.getRow(i).getCell(j);
-				CellStyle cellStyle = wb.createCellStyle();
+				
 				cellStyle.cloneStyleFrom(cell.getCellStyle());
 				cellStyle.setFillForegroundColor(color);
 				cellStyle.setFillPattern(CellStyle.SOLID_FOREGROUND);

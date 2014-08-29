@@ -78,7 +78,8 @@ public class Calculate {
 					res = front * back;
 					break;
 				case '/':
-					res = front / back;
+					if(back == 0) res = 0;
+					else res = front / back;
 					break;
 				}
 				stack.push(res);

@@ -53,6 +53,7 @@ public class ExpParser {
         result = this.parseAssign(); //处理赋值语句
         //处理完赋值语句，应该就是表达式结束符，如果不是，则返回异常
         if (!this.token.equals(EOE)) {
+        	System.err.println(expStr);
             this.handleError(SYNTAX_ERROR);
         }
         return result;
@@ -142,10 +143,11 @@ public class ExpParser {
                 case '/':
                     //如果是除法，判断当前字表达式的值是否为0，如果为0，则抛出被0除异常
                     if (partialResult == 0.0) {
-                        this.handleError(DIVBYZERO_ERROR);
+                    	result = 0;
+                        //this.handleError(DIVBYZERO_ERROR);
                     }
                     //除数不为0，则进行除法运算
-                    result = result / partialResult;
+                    else result = result / partialResult;
                     break;
                 case '%':
                     //如果是取模运算，也要判断当前子表达式的值是否为0
@@ -273,6 +275,8 @@ public class ExpParser {
     	String[] temp = vname.split("\\[|]"); 
     	int row = Integer.parseInt(temp[1]) + position.GetRow();
     	int column = Integer.parseInt(temp[3]) + position.GetColumn();
+    	if(row < 0 || column < 0 || row >= sheetReader.getRowCount() || column >= sheetReader.getColumnCount())
+    		return 0;
     	if(sheetReader.getCells()[row][column].getValueType() == 0)
     		return Double.parseDouble(sheetReader.getCells()[row][column].getValue());
     	else

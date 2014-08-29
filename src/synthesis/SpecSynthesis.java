@@ -201,8 +201,7 @@ public class SpecSynthesis extends IOSynthesis {
 
             Integer[] newInputs = new Integer[inputs.size()];
             for (int i = 0; i < newInputs.length; i++) {
-                    int input = ((IntNum) model.getConstInterp(allVars.get(i)))
-                                    .getInt();
+                    int input = ((IntNum) model.getConstInterp(allVars.get(i))).getInt();
                     newInputs[i] = input;
             }
             int output = ((IntNum) model.getConstInterp(resExpr)).getInt();

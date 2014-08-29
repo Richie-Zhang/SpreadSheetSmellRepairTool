@@ -55,6 +55,10 @@ import file.SheetReader;
 
 public class MainUI extends JFrame {
 	private static final long serialVersionUID = 1L;
+	
+	public static final int MAXROW = 700;
+	public static final int MAXCOLUMN = 52;
+	
 	private JTextField textField_fileName;
 	private JList<String> list_sheetList;
 	private JTable table, table_snippet, table_cellArray, table_smell;
@@ -69,7 +73,7 @@ public class MainUI extends JFrame {
 	private ArrayList<ExtractCellArray> extractCellArrays = new ArrayList<>();
 	private ArrayList<DetectRepairSmell> detectRepairSmells = new ArrayList<>();
 	private int currentSheetIndex = -1;
-	private Color[][] snippetColors = new Color[500][27], cellArrayColors = new Color[500][27], smellColors = new Color[500][27];
+	private Color[][] snippetColors = new Color[MAXROW][MAXCOLUMN], cellArrayColors = new Color[MAXROW][MAXCOLUMN], smellColors = new Color[MAXROW][MAXCOLUMN];
 
 	private String lastPath = System.getProperty("user.dir");
 	
@@ -140,10 +144,17 @@ public class MainUI extends JFrame {
 		            try {
 						sheetReaders = ReadWriteFile.readExcelFile(filename);
 						if(sheetReaders == null){
-							JOptionPane.showMessageDialog(null, "File is wrong or too big, open file failed!");
+							JOptionPane.showMessageDialog(null, "Open file failed!");
 							return;
 						}
-							
+						for(SheetReader sheetReader : sheetReaders) {
+							System.err.println(sheetReader.getRowCount() + "," + sheetReader.getColumnCount());
+							if(sheetReader.getRowCount() > MAXROW || sheetReader.getColumnCount() > MAXCOLUMN) {
+								JOptionPane.showMessageDialog(null, "File is too large!");
+								return;
+							}
+						}
+						
 						extractCellArrays.clear();
 						for(SheetReader sheetReader : sheetReaders) {
 							extractCellArrays.add(new ExtractCellArray(sheetReader));
@@ -222,9 +233,18 @@ public class MainUI extends JFrame {
 		JScrollPane scrollPane_table = new JScrollPane();
 		tablePanel.add(scrollPane_table, BorderLayout.CENTER);
 		
-		String[] headers = {"","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"};
-		Object[][] cellData = new Object[500][27];
-		for(int i = 0 ; i < 500 ; i++)
+		String[] headers = {"","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
+				"AA","AB","AC","AD","AE","AF","AG","AH","AI","AJ","AK","AL","AM","AN","AO","AP","AQ","AR","AS","AT","AU","AV","AW","AX","AY","AZ"/*,
+				"BA","BA","BC","BD","BE","BF","BG","BH","BI","BJ","BK","BL","BM","BN","BO","BP","BQ","BR","BS","BT","BU","BV","BW","BX","BY","BZ",
+				"CA","CB","CC","CD","CE","CF","CG","CH","CI","CJ","CK","CL","CM","CN","CO","CP","CQ","CR","CS","CT","CU","CV","CW","CX","CY","CZ",
+				"DA","DB","DC","DD","DE","DF","DG","DH","DI","DJ","DK","DL","DM","DN","DO","DP","DQ","DR","DS","DT","DU","DV","DW","DX","DY","DZ",
+				"EA","EB","EC","ED","EE","EF","EG","EH","EI","EJ","EK","EL","EM","EN","EO","EP","EQ","ER","ES","ET","EU","EV","EW","EX","EY","EZ",
+				"FA","FB","FC","FD","FE","FF","FG","FH","FI","FJ","FK","FL","FM","FN","FO","FP","FQ","FR","FS","FT","FU","FV","FW","FX","FY","FZ",
+				"GA","GB","GC","GD","GE","GF","GG","GH","GI","GJ","GK","GL","GM","GN","GO","GP","GQ","GR","GS","GT","GU","GV","GW","GX","GY","GZ",
+				"HA","HB","HC","HD","HE","HF","HG","HH","HI","HJ","HK","HL","HM","HN","HO","HP","HQ","HR","HS","HT","HU","HV","HW","HX","HY","HZ",
+				"IA","IB","IC","ID","IE","IF","IG","IH","II","IJ","IK","IL","IM","IN","IO","IP","IQ","IR","IS","IT","IU","IV"*/};
+		Object[][] cellData = new Object[MAXROW][MAXCOLUMN];
+		for(int i = 0 ; i < MAXROW ; i++)
 			cellData[i][0] = i+1;
 		DefaultTableModel model = new DefaultTableModel(cellData, headers);
 		table = new JTable(model){
@@ -253,12 +273,12 @@ public class MainUI extends JFrame {
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 		table.getTableHeader().setReorderingAllowed(false);
 		table.getColumnModel().getColumn(0).setPreferredWidth(30);
-		for(int i = 1 ; i < 27 ; i++) {
+		for(int i = 1 ; i < MAXCOLUMN ; i++) {
 			TableColumn column = table.getColumnModel().getColumn(i);
 			column.setPreferredWidth(100);
 			column.setMinWidth(50);
 		}
-		for(int i = 0 ; i < 500 ; i++){
+		for(int i = 0 ; i < MAXROW ; i++){
 			snippetColors[i][0] = table.getTableHeader().getBackground();
 			cellArrayColors[i][0] = table.getTableHeader().getBackground();
 			smellColors[i][0] = table.getTableHeader().getBackground();
@@ -1280,8 +1300,8 @@ public class MainUI extends JFrame {
 	private void clearSheet() {
 		table.clearSelection();
 		TableModel tableModel = table.getModel();
-		for(int i = 0 ; i < 500 ; i++)
-			for(int j = 1 ; j < 27 ; j++){
+		for(int i = 0 ; i < MAXROW ; i++)
+			for(int j = 1 ; j < MAXCOLUMN ; j++){
 				tableModel.setValueAt("", i, j);
 			}
 		table.setModel(tableModel);
@@ -1377,8 +1397,8 @@ public class MainUI extends JFrame {
 	}
 	
 	private void clearColor(Color[][] colors) {
-		for(int i = 0 ; i < 500 ; i++)
-			for(int j = 1 ; j < 27 ; j++)
+		for(int i = 0 ; i < MAXROW ; i++)
+			for(int j = 1 ; j < MAXCOLUMN ; j++)
 				colors[i][j] = Color.WHITE;
 		table.updateUI();
 	}

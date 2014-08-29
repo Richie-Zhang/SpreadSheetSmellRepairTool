@@ -33,6 +33,9 @@ public class ConvertFormula {
 	
 	public ArithExpr convertFormula(String expression, ArrayList<ArithExpr> varsTable, Context ctx) throws Z3Exception {
 		expression += "#";
+		expression = expression.replaceAll("\\[", "");
+		expression = expression.replaceAll("]", "");
+		//System.err.println(expression);
 		Stack<ArithExpr> vars = new Stack<>();
 		Stack<Character> s = new Stack<>();
 		int index = 0;

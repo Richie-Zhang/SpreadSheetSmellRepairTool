@@ -5,7 +5,7 @@ import javax.swing.table.AbstractTableModel;
 public class MyTableModel extends AbstractTableModel {
 	private static final long serialVersionUID = 1L;
 	private String[] columnNames = {"", "Upper left", "Lower right"};
-	private Object[][] data = new Object[500][3];
+	private Object[][] data = new Object[15000][3];
 	private int count = 0;
 	
 	public int getColumnCount() {

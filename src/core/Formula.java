@@ -6,6 +6,7 @@ import java.util.Collections;
 public class Formula {
 	private ArrayList<StructDefine.R1C1Relative> InputSet;
 	private String R1C1Formula;
+	private boolean valid;
 
     private enum State {
         START, COLUMN, CELL, ONECHAR, SOMECHARS, LEFT, END
@@ -13,25 +14,41 @@ public class Formula {
 
     public Formula() {
         InputSet = new ArrayList<StructDefine.R1C1Relative>();
+        valid = false;
     }
 
     public Formula(StructDefine.Position pos, String formula) {
+    	while(formula.startsWith("+") || formula.startsWith("-"))
+    		formula = formula.substring(1);
+    	while(formula.contains("++"))
+    		formula = formula.replaceAll("\\+\\+", "\\+");
+    	while(formula.contains("--"))
+    		formula = formula.replaceAll("--", "-");
+    	while(formula.contains("(+"))
+    		formula = formula.replaceAll("\\(\\+", "\\(");
+    	while(formula.contains("(-"))
+    		formula = formula.replaceAll("\\(-", "\\(");
+    	formula = formula.replaceAll("%", "/100");
         InputSet = new ArrayList<StructDefine.R1C1Relative>();
+        valid = true;
         R1C1Formula = convertToR1C1(pos, formula);
     }
 
     public String convertToR1C1(StructDefine.Position pos, String A1) {
     	A1 = A1.replaceAll(" ", "");
+    	A1 = A1.toUpperCase();
+    	//System.err.println(A1);
     	if(A1.startsWith("+")) A1 = A1.substring(1);
         int row = pos.GetRow(), column = pos.GetColumn();
-        String result = "";
+        String result = "", checkValid = "";
         int length = A1.length(), index = 0;
-        char lastChar = '#';
+        char lastChar = '#', lastTwoChar = '#';
         int lastInt = 0;
         State state = State.START;
-
+        
+        char thisChar = '#';
         while (state != State.END) {
-            char thisChar = '#';
+            
             if (index == length) {
                 state = State.END;
             } else {
@@ -41,6 +58,7 @@ public class Formula {
                 case START:
                     if (thisChar >= 'A' && thisChar <= 'Z') {
                         lastChar = thisChar;
+                        checkValid += thisChar;
                         state = State.COLUMN;
                     } else {
                         result = result + thisChar;
@@ -48,54 +66,73 @@ public class Formula {
                     break;
                 case COLUMN:
                     if (thisChar >= '0' && thisChar <= '9') {
+                    	checkValid = "";
                         lastInt = thisChar - '0';
                         //System.out.println(lastInt);
                         state = State.CELL;
                     } else if (thisChar >= 'A' && thisChar <= 'Z') {
-                        result = result + lastChar;
-                        lastChar = thisChar;
+                    	if(index == length) {
+                    		valid = false;
+                    		return "";
+                    	}
+                    	checkValid += thisChar;
+                    	if(checkValid.length() > 3) {
+                    		valid = false;
+                    		return "";
+                    	}
+                    	char nextChar = A1.charAt(index);
+                    	if(nextChar >= '0' && nextChar <= '9') {
+                    		lastTwoChar = lastChar;
+                    		lastChar = thisChar;
+                    		//state = State.CELL;
+                    		//index++;
+                    	}
+                    	else {
+                    		result = result + lastChar;
+                    		lastChar = thisChar;
+                    	}
                     } else {
+                    	checkValid = "";
                         result = result + lastChar + thisChar;
                         lastChar = '#';
                         state = State.START;
                     }
                     break;
                 case CELL:
+                	checkValid = "";
                     if (thisChar >= '0' && thisChar <= '9') {
                         lastInt = 10 * lastInt + (thisChar - '0');
-                    } else if (thisChar >= 'A' && thisChar <= 'Z') {
-                        //****
-                        int columnInt = (lastChar - 'A') - column;
-                        int rowInt = lastInt - 1 - row;
-                        StructDefine.R1C1Relative thisPosition = new StructDefine.R1C1Relative(rowInt, columnInt);
-                    	if(!InputSet.contains(thisPosition))
-                    		InputSet.add(thisPosition);
-                        
-                        result = result + "<R[" + rowInt + "]";
-                        result = result + "C[" + columnInt + "]>";
-                        //****
-                        lastChar = thisChar;
-                        state = State.COLUMN;
                     } else {
-                        //****
-                        int columnInt = (lastChar - 'A') - column;
+                    	int columnInt = (lastChar - 'A') - column;
+                    	if(lastTwoChar != '#') {
+                    		columnInt += 26*(lastTwoChar - 'A' + 1);
+                    		lastTwoChar = '#';
+                    	}
                         int rowInt = lastInt - 1 - row;
                         StructDefine.R1C1Relative thisPosition = new StructDefine.R1C1Relative(rowInt, columnInt);
-
                     	if(!InputSet.contains(thisPosition))
                     		InputSet.add(thisPosition);
                         
                         result = result + "<R[" + rowInt + "]";
                         result = result + "C[" + columnInt + "]>";
-                        //****
-                        result = result + thisChar;
-                        lastChar = '#';
-                        state = State.START;
+                        
+                    	if (thisChar >= 'A' && thisChar <= 'Z') {
+                    		lastChar = thisChar;
+                    		state = State.COLUMN;
+                    	} else {
+                    		result = result + thisChar;
+                    		lastChar = '#';
+                    		state = State.START;
+                    	}
                     }
                     break;
                 case END:
                     if (lastChar != '#') {
                         int columnInt = (lastChar - 'A') - column;
+                        if(lastTwoChar != '#') {
+                    		columnInt += 26*(lastTwoChar - 'A' + 1);
+                    		lastTwoChar = '#';
+                    	}
                         int rowInt = lastInt - 1 - row;
                         StructDefine.R1C1Relative thisPosition = new StructDefine.R1C1Relative(rowInt, columnInt);
                     	if(!InputSet.contains(thisPosition))
@@ -109,10 +146,9 @@ public class Formula {
                     break;
             }
         }
-
         result = addFuncSign(result);
         //处理函数中的：
-        int sumStart = result.toLowerCase().indexOf("sum");
+        int sumStart = result.toLowerCase().indexOf("sum(");
         while(sumStart != -1) {
         	int sumEnd = result.indexOf("}", sumStart);
         	String sum = result.substring(sumStart, sumEnd);
@@ -133,6 +169,7 @@ public class Formula {
         	sumStart = result.toLowerCase().indexOf("sum", sumEnd+1);
         }
         Collections.sort(InputSet);
+        //System.err.println(result);
         return result;
     }
  
@@ -161,7 +198,16 @@ public class Formula {
 			case LEFT:
 				if(thisChar == '>') {
 					StructDefine.Position position = transPos(unhandled, pos);
-					retString += "" + (char)(position.GetColumn()+'A') + (position.GetRow()+1);
+					int tempColumn = position.GetColumn();
+					if(tempColumn < 26)
+						retString += "" + (char)(tempColumn+'A');
+					else {
+						int firstNum = tempColumn/26;
+						retString += "" + (char)(firstNum+'A'-1);
+						retString += "" + (char)(tempColumn-firstNum*26+'A');
+					}
+					
+					retString += "" + (position.GetRow()+1);
 					state = State.START;
 					unhandled = "";
 				}
@@ -188,6 +234,10 @@ public class Formula {
     	return convertToA1(pos, R1C1Formula);
     }
     
+    public boolean getValid() {
+    	return valid;
+    }
+    
     private StructDefine.Position transPos(String pos, StructDefine.Position position) throws Exception {
         //从sheet中取出该变量的值
     	String[] temp = pos.split("\\[|]");
@@ -202,7 +252,7 @@ public class Formula {
     	int index = 0;
     	int countOfLeft = 0;
     	char thisChar = '#';
-    	String recordString = "";
+    	String recordString = "", recordString2 = "";
     	State state = State.START;
     	
     	while (state != State.END) {
@@ -237,6 +287,7 @@ public class Formula {
                 	recordString += thisChar;
                 }
                 else if (thisChar == '(') {
+                	if(!recordString.equals("SUM")) valid = false;
                 	recordString += thisChar;
                 	state = State.LEFT;
                 	countOfLeft++;
@@ -248,15 +299,18 @@ public class Formula {
                 }
                 break;
             case LEFT:
-            	recordString += thisChar;
+            	//recordString += thisChar;
+            	recordString2 += thisChar;
             	if(thisChar == '(') {
             		countOfLeft++;	
             	}
             	if (thisChar == ')') {
             		countOfLeft--;
             		if(countOfLeft == 0) {
-            			result = result + "{" + recordString + "}";
+            			recordString2 = recordString2.substring(0, recordString2.length()-1);
+            			result = result + "{" + recordString + addFuncSign(recordString2) +")}";
             			recordString = "";
+            			recordString2 = "";
             			state = State.START;
             		}
             	}

@@ -65,9 +65,17 @@ public class StructDefine {
             if (!(pos.charAt(0) >= 'A' && pos.charAt(0) <= 'Z')) {
                 return null;
             }
-            int c = pos.charAt(0) - 'A';
+            int c, start;
+            if(pos.charAt(1) >= 'A' && pos.charAt(1) <= 'Z') {
+            	c = pos.charAt(1) - 'A' + 26 * (pos.charAt(0) - 'A' + 1);
+            	start = 2;
+            }
+            else {
+	            c = pos.charAt(0) - 'A';
+	            start = 1;
+            }
             int r = 0;
-            for (int i = 1; i < pos.length(); i++) {
+            for (int i = start; i < pos.length(); i++) {
                 char temp = pos.charAt(i);
                 if (!(temp >= '0' && temp <= '9')) {
                     return null;
@@ -75,7 +83,7 @@ public class StructDefine {
                 r = r * 10 + (temp - '0');
             }
             r--;
-            return new Position(r, c);
+            return new Position(r, c);           
         }
 
         public int GetRow() {

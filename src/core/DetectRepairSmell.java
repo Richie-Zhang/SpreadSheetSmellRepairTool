@@ -122,8 +122,9 @@ public class DetectRepairSmell {
     		for(int j = startColumn ; j <= endColumn ; j++) {
     			String advise = repairFormula.getA1Formula(new StructDefine.Position(i, j));
     			ExpParser expParser = new ExpParser(sheetReader, new StructDefine.Position(i, j));
-    			double value = expParser.evaluate(repairFormula.getR1C1Formula());	
-    			if(!advise.equals(sheetReader.getCells()[i][j].getFormula())) {
+    			double value = expParser.evaluate(repairFormula.getR1C1Formula());
+    			String thisFormula = sheetReader.getCells()[i][j].getFormula();
+    			if(thisFormula == null || (!advise.equals(thisFormula) && !FormulaParser.isEquivalent(repairFormula, new Formula(new StructDefine.Position(i, j) ,thisFormula), IV))) {
     				StructDefine.RepairAdvise ra = new StructDefine.RepairAdvise();
     				ra.SetFormula(advise);
     				ra.SetValue(value);
@@ -139,6 +140,10 @@ public class DetectRepairSmell {
 	
 	public int getState() {
 		return state;
+	}
+	
+	public Formula getRepairFormula() {
+		return repairFormula;
 	}
 	
 	public StructDefine.SmellAndRepair getSmellAndRepair() {
@@ -251,6 +256,7 @@ public class DetectRepairSmell {
 			if((int)output - output > 0.000001 || (int)output - output < -0.000001) valid = false;
 			if(valid) IO.add(new IOPair(inputs, (int)output));
 		}
+		//System.err.println(IO.size());
 	}
 	
 	private Formula recoveryFormulaPattern() throws Exception {
@@ -286,6 +292,7 @@ public class DetectRepairSmell {
 				System.out.println("No solution! Components insufficient!");
 			} else {
 				String program = mergeProgs(progs);
+				program = addSign(program);
 		    	String A1Formula = convertToFormula(program, CA.get(0));
 		    	Formula formula = new Formula(CA.get(0), A1Formula);
 		    	function = new StructDefine.Function(formula);
@@ -320,7 +327,9 @@ public class DetectRepairSmell {
 				boolean existed = false, compatible = true;
 				for(StructDefine.Function function : newGroup) {
 					if(func == function) existed = true;
-					if(!isCompatible(function, func)) compatible = false;
+					if(!isCompatible(function, func)) {
+						compatible = false;
+					}
 				}
 				if(existed || !compatible) continue;
 				newGroup.add(func);
@@ -355,6 +364,7 @@ public class DetectRepairSmell {
 	}
 	
 	private boolean isCompatible(StructDefine.Function func1, StructDefine.Function func2) throws Z3Exception {
+		System.out.println(func1.getFunc() + "," + func2.getFunc());
 		ConvertFormula convertFormula = new ConvertFormula();
 		ArithExpr iev1 = convertFormula.convertFormula(func1.getFunc(), varsTable, ctx);
 		ArithExpr iev2 = convertFormula.convertFormula(func2.getFunc(), varsTable, ctx);
@@ -363,7 +373,7 @@ public class DetectRepairSmell {
 		solver.add(ctx.mkNot(ctx.mkEq(iev1, iev2)));
 		
 		for(int i = 0 ; i < IV.size() ; i++) {
-			if(!func1.getFunc().contains("i"+i) || !func2.getFunc().contains("i"+i))
+			if(!func1.getFunc().contains("[i"+i+"]") || !func2.getFunc().contains("[i"+i+"]"))
 				solver.add(ctx.mkEq(ctx.mkInt(0), varsTable.get(i)));
 		}
 		
@@ -392,9 +402,6 @@ public class DetectRepairSmell {
 				}
 			}
 		}
-		System.err.print(count[0]);
-		System.err.print(count[1]);
-		System.err.print(count[2]);
 		
 		ArrayList<Component> comps = new ArrayList<Component>();
 		for(int i = 0 ; i < count[0] ; i++)
@@ -432,7 +439,7 @@ public class DetectRepairSmell {
 	
 	private boolean hasCommonCells(Function function1, Function function2) {
 		for(int i = 0 ; i < IV.size() ; i++) {
-			if(function1.getFunc().contains("i"+i) && function2.getFunc().contains("i"+i))
+			if(function1.getFunc().contains("[i"+i+"]") && function2.getFunc().contains("[i"+i+"]"))
 				return true;
 		}
 		return false;
@@ -484,10 +491,41 @@ public class DetectRepairSmell {
 		return program;
 	}
 	
+	private String addSign(String prog) {
+		String program = "";
+		int index = 0, length = prog.length();
+		
+		boolean in = false;
+		while(index < length) {
+			if(in) {
+				if(prog.charAt(index) >= '0' && prog.charAt(index) <= '9')
+					program = program + prog.charAt(index);
+				else {
+					program = program + "]" + prog.charAt(index);
+					in = false;
+				}
+			}
+			else {
+				if(prog.charAt(index) == 'i') {
+					program = program + "[i" ;
+					in = true;
+				}
+				else
+					program = program + prog.charAt(index);
+			}
+			index++;
+		}
+		if(in) program = program + "]";
+		
+		return program;
+	}
+	
+	
 	private String convertToFormula(String program, StructDefine.Position position) {
 		String formula = program;
+		System.out.println(formula);
 		for(int i = 0 ; i < IV.size() ; i++) {
-			String si = "i" + i;
+			String si = "\\[i" + i + "]";
 			StructDefine.Position thisPosition = IV.get(i).GetPosition(position);
 			char c = (char) ('A' + thisPosition.GetColumn());
 			String sip = c + "" + (thisPosition.GetRow() + 1);

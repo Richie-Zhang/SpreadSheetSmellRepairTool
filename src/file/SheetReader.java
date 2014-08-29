@@ -9,36 +9,55 @@ import core.StructDefine;
 public class SheetReader {
 	private String sheetName;
 	private int rowCount, columnCount;	//最大行数/列数
-	private boolean overFlow;	//是否超过500*26的大小
+	private boolean valid;
+	private boolean hasFormula;
 	private StructDefine.Cell[][] cells;
 	
 	public SheetReader(Sheet sheet) {
 		this.sheetName = sheet.getSheetName();
-		this.rowCount = 0;
-		this.columnCount = 0;
-		this.cells = new StructDefine.Cell[500][26];
-		
-		for(int i = 0 ; i < 500 ; i++)
-			for(int j = 0; j < 26 ; j++){
-				this.cells[i][j] = new StructDefine.Cell();
-			}
-		
 		this.rowCount = sheet.getLastRowNum()+1;
-		this.overFlow = false;
-		if(this.rowCount > 500){
-			this.overFlow = true;
-			this.rowCount = 500;
-		}
-		for (int i = 0; i < this.rowCount; i++) {
+		this.hasFormula = false;
+		this.valid = true;
+		
+		for(int i = 0 ; i < this.rowCount; i++) {
 			Row row = sheet.getRow(i);
 			if(row == null) continue;
 			if(this.columnCount < row.getLastCellNum())
 				this.columnCount = row.getLastCellNum();
-			if(this.columnCount > 26){
-				this.columnCount = 26;
-				this.overFlow = true;
+		}
+		this.cells = new StructDefine.Cell[this.rowCount][this.columnCount];
+		
+		for(int i = 0 ; i < this.rowCount ; i++)
+			for(int j = 0; j < this.columnCount ; j++){
+				this.cells[i][j] = new StructDefine.Cell();
 			}
-			for (int j = 0; j < ((row.getLastCellNum()>26)?26:row.getLastCellNum()); j++) {
+
+		for(int i = 0 ; i < this.rowCount; i++) {
+			Row row = sheet.getRow(i);
+			if(row == null) continue;
+			for(int j = 0 ; j < row.getLastCellNum() ; j++) {
+				Cell cell = row.getCell(j);
+				if (cell == null) continue;
+				if(cell.getCellType() == Cell.CELL_TYPE_FORMULA) {
+					try{
+						cell.getNumericCellValue();
+					} catch(IllegalStateException e1){
+						continue;
+					}
+					this.hasFormula = true;
+					break;
+				}
+			}
+			if(this.hasFormula) break;
+		}
+		
+		if(!this.hasFormula) return;
+
+		try{
+		for (int i = 0; i < this.rowCount; i++) {
+			Row row = sheet.getRow(i);
+			if(row == null) continue;
+			for (int j = 0; j < row.getLastCellNum(); j++) {
 				Cell cell = row.getCell(j);
 				if (cell == null) continue;
 				this.cells[i][j].setCellType(cell.getCellType()); 
@@ -75,6 +94,9 @@ public class SheetReader {
 								}
 							}
 						}
+						
+						if(cell.getCellFormula().contains("$") || cell.getCellFormula().contains("IF") || cell.getCellFormula().contains("!"))
+							this.cells[i][j].setCellType(Cell.CELL_TYPE_STRING); 
 						break;
 					case Cell.CELL_TYPE_BLANK:
 						break;
@@ -83,8 +105,12 @@ public class SheetReader {
 				} 
 			}
 		}
+		}catch(Exception e) {
+			this.valid = false;
+			return;
+		}
 	}
-
+	
 	public String getSheetName() {
 		return this.sheetName;
 	}
@@ -97,8 +123,12 @@ public class SheetReader {
 		return this.columnCount;
 	}
 	
-	public boolean getOverFlow() {
-		return overFlow;
+	public boolean getValid() {
+		return valid;
+	}
+	
+	public boolean getHasFormula() {
+		return hasFormula;
 	}
 	
 	public StructDefine.Cell[][] getCells() {
@@ -114,9 +144,10 @@ public class SheetReader {
 	}
 	
 	public double getCellValueAt(StructDefine.Position pos) {
+		if(pos.GetRow() < 0 || pos.GetColumn() < 0 || pos.GetRow() >= this.rowCount || pos.GetColumn() >= this.columnCount)
+			return 0;
 		if(cells[pos.GetRow()][pos.GetColumn()].getValueType() == 0)
 			return Double.parseDouble(cells[pos.GetRow()][pos.GetColumn()].getValue());
-		else
-			return 0;
+		return 0;
 	}
 }

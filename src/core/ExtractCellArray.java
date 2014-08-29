@@ -3,6 +3,9 @@ package core;
 import java.util.ArrayList;
 import java.util.Stack;
 
+import org.apache.poi.ss.usermodel.Cell;
+
+import parser.ExpParser;
 import file.SheetReader;
 
 public class ExtractCellArray {
@@ -74,7 +77,8 @@ public class ExtractCellArray {
             }
             if (handleOne) continue;
             //can't find a fence, so the snippet is pure
-            Snippets.add(snippet);
+            if(snippet.GetTopLeft().GetRow() != snippet.GetBottomRight().GetRow() || snippet.GetTopLeft().GetColumn() != snippet.GetBottomRight().GetColumn())
+            	Snippets.add(snippet);
         }
     }
 
@@ -197,8 +201,11 @@ public class ExtractCellArray {
     			while(k < columnEnd-columnStart+1 && (type[i][k] == 1 || type[i][k] == 0)) k++;
     			if(k-j > 1) {
     				StructDefine.Region newRegin = new StructDefine.Region(new StructDefine.Position(rowStart+i, columnStart+j), new StructDefine.Position(rowStart+i, columnStart+k-1));
-    				if(hasFormula(newRegin))
-    					ret.add(pureCellArray(newRegin));
+    				ArrayList<Formula> formulas = getFormulas(newRegin);
+    				if(formulas != null) {
+    					StructDefine.Region temp = pureCellArray(newRegin, formulas);
+    					if(temp != null) ret.add(temp);
+    				}
     			}
     			j = k;
     		}
@@ -213,8 +220,11 @@ public class ExtractCellArray {
     			while(k < rowEnd-rowStart+1 && (type[k][j] == 2 || type[k][j] == 0)) k++;
     			if(k-i > 1) {
     				StructDefine.Region newRegin = new StructDefine.Region(new StructDefine.Position(rowStart+i, columnStart+j), new StructDefine.Position(rowStart+k-1, columnStart+j));
-    				if(hasFormula(newRegin))
-    					ret.add(pureCellArray(newRegin));
+    				ArrayList<Formula> formulas = getFormulas(newRegin);
+    				if(formulas != null) {
+    					StructDefine.Region temp = pureCellArray(newRegin, formulas);
+    					if(temp != null) ret.add(temp);
+    				}
     			}
     			i = k;
     		}
@@ -222,31 +232,40 @@ public class ExtractCellArray {
     	return ret;
     }
     
-    private boolean hasFormula(StructDefine.Region snippet) {
+    private ArrayList<Formula> getFormulas(StructDefine.Region snippet) {
+    	ArrayList<Formula> formulas = new ArrayList<>();
     	int rowStart = snippet.GetTopLeft().GetRow(), rowEnd = snippet.GetBottomRight().GetRow();
         int columnStart = snippet.GetTopLeft().GetColumn(), columnEnd = snippet.GetBottomRight().GetColumn();
         for(int i = rowStart ; i <= rowEnd ; i++)
         	for(int j = columnStart ; j <= columnEnd ; j++) {
-        		if(sheetReader.getCells()[i][j].getFormula() != null)
-        			return true;
+        		if(sheetReader.getCells()[i][j].getCellType() == Cell.CELL_TYPE_FORMULA) {
+        			Formula form = new Formula(new StructDefine.Position(i, j), sheetReader.getCells()[i][j].getFormula());
+        			if(form.getValid())
+        				formulas.add(form);
+        		}
         	}
-        return false;
+        if(formulas.size() == 0)
+        	return null;
+        else return formulas;
     }
     
     private int formulaInputType(StructDefine.Position pos) {	//return the type of formula's input, 1-only the same column; 2-only the same row; 3-other
         StructDefine.Cell cell= sheetReader.getCells()[pos.GetRow()][pos.GetColumn()];
         if(cell.getValueType() != 0) return -1;
+        if(cell.getCellType() != Cell.CELL_TYPE_FORMULA && cell.getCellType() != Cell.CELL_TYPE_NUMERIC) return -1;
     	String sFormula = cell.getFormula();
         if(sFormula == null) return 0;
         Formula formula = new Formula(pos, sFormula);
+        if(!formula.getValid()) return -1;
         ArrayList<StructDefine.R1C1Relative> InputSet = formula.GetInputSet();
-        boolean sameRow = false, sameColumn = false;
+        if(InputSet.size() == 0) return 0;
+        boolean sameRow = true, sameColumn = true;
         for (StructDefine.R1C1Relative position : InputSet) {
-            if (position.GetColumn() == 0 && position.GetRow() != 0) {
-                sameColumn = true;
+            if (position.GetColumn() != 0) {
+                sameColumn = false;
             }
-            if (position.GetRow() == 0 && position.GetColumn() != 0) {
-                sameRow = true;
+            if (position.GetRow() != 0) {
+                sameRow = false;
             }
         }
         if (sameRow && !sameColumn) {
@@ -258,24 +277,50 @@ public class ExtractCellArray {
         return 3;
     }
 
-    private StructDefine.Region pureCellArray(StructDefine.Region snippet) {	//remove null cell in cell array¡®s border
+    private StructDefine.Region pureCellArray(StructDefine.Region snippet, ArrayList<Formula> formulas) {	//remove null cell in cell array¡®s border
     	int rowStart = snippet.GetTopLeft().GetRow(), rowEnd = snippet.GetBottomRight().GetRow();
         int columnStart = snippet.GetTopLeft().GetColumn(), columnEnd = snippet.GetBottomRight().GetColumn();
         if(rowStart == rowEnd) {
         	int columnStartNew = columnStart, columnEndNew = columnEnd;
-        	while(columnStartNew <= columnEnd && sheetReader.getCells()[rowStart][columnStartNew].getValueType() != 0) columnStartNew ++;
-        	while(columnEndNew >= columnStartNew && sheetReader.getCells()[rowStart][columnEndNew].getValueType() != 0) columnEndNew --;
-        	if(columnStartNew <= columnEndNew) 
+        	while(columnStartNew <= columnEnd && !isCellOfArray(rowStart,columnStartNew,formulas)) columnStartNew ++;
+        	while(columnEndNew >= columnStartNew && !isCellOfArray(rowStart,columnEndNew,formulas)) columnEndNew --;
+        	if(columnStartNew < columnEndNew) 
         		return new StructDefine.Region(new StructDefine.Position(rowStart, columnStartNew), new StructDefine.Position(rowEnd, columnEndNew));
         }
         else if(columnStart == columnEnd) {
         	int rowStartNew = rowStart, rowEndNew = rowEnd;
-        	while(rowStartNew <= rowEnd && sheetReader.getCells()[rowStartNew][columnStart].getValueType() != 0) rowStartNew ++;
-        	while(rowEndNew >= rowStartNew && sheetReader.getCells()[rowEndNew][columnStart].getValueType() != 0) rowEndNew --;
-        	if(rowStartNew <= rowEndNew) 
+        	while(rowStartNew <= rowEnd && !isCellOfArray(rowStartNew,columnStart,formulas)) rowStartNew ++;
+        	while(rowEndNew >= rowStartNew && !isCellOfArray(rowEndNew,columnStart,formulas)) rowEndNew --;
+        	if(rowStartNew < rowEndNew) 
         		return new StructDefine.Region(new StructDefine.Position(rowStartNew, columnStart), new StructDefine.Position(rowEndNew, columnEnd));
         }
         return null;
+    }
+    
+    private boolean isCellOfArray(int row, int column, ArrayList<Formula> formulas) {
+    	if(sheetReader.getCells()[row][column].getValueType() != 0) return false;
+    	if(sheetReader.getCells()[row][column].getCellType() == Cell.CELL_TYPE_FORMULA) return true;
+    	if(sheetReader.getCells()[row][column].getCellType() == Cell.CELL_TYPE_NUMERIC) {
+    		for(Formula formula : formulas) {
+    			double cellValue = Double.parseDouble(sheetReader.getCells()[row][column].getValue());
+				ExpParser eParser = new ExpParser(sheetReader, new StructDefine.Position(row, column));
+				try {
+					//System.err.println(formula.getR1C1Formula());
+					try{
+						double formulaValue = eParser.evaluate(formula.getR1C1Formula());
+						if(cellValue - formulaValue < 0.000001 && cellValue - formulaValue > -0.000001)
+						return true;
+					}
+					catch(Exception e) {
+						return false;
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+    		}
+    		return false;
+    	}
+    	return false;
     }
 
     private boolean isValidSnippet(StructDefine.Region snippet) {
